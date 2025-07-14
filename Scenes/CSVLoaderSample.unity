@@ -301,7 +301,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   scenarioCsv: {fileID: 4900000, guid: 0eda03e41d068ec4183071b6fe0cff83, type: 3}
-  enemyCsv: {fileID: 4900000, guid: 41cca64deadb63740abc72d452d2fa10, type: 3}
+  hugeDataCsv: {fileID: 4900000, guid: 939f9877eaf38664893456a19a4db82f, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
