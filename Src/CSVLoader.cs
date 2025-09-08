@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
@@ -8,6 +7,9 @@ namespace CSV4Unity
 {
     public static class CSVLoader
     {
+        /// <summary>
+        /// ジェネリック版のLoadCSV
+        /// </summary>
         public static CsvData<TEnum> LoadCSV<TEnum>(TextAsset csvFile, CsvLoaderOptions options, string dataName = null)
             where TEnum : struct, Enum
         {
@@ -105,6 +107,90 @@ namespace CSV4Unity
             return result;
         }
 
+        /// <summary>
+        /// 非ジェネリック版のLoadCSV
+        /// </summary>
+        public static CsvData LoadCSV(TextAsset csvFile, CsvLoaderOptions options, string dataName = null)
+        {
+            if (csvFile == null) throw new ArgumentNullException(nameof(csvFile), "CSV file cannot be null.");
+            if (options == null) throw new ArgumentNullException(nameof(options), "Options cannot be null.");
+
+            var buffer = csvFile.text.AsMemory();
+            var span = buffer.Span;
+            int pos = 0;
+            int length = span.Length;
+
+            var result = new CsvData { DataName = string.IsNullOrEmpty(dataName) ? csvFile.name : dataName };
+            var headerNames = new List<string>();
+
+            // ヘッダーの読み込みと保存
+            if (options.HasHeader)
+            {
+                int lineEnd = IndexOf(span, '\n', ref pos);
+                if (lineEnd < 0) lineEnd = length;
+
+                var headerSpan = span.Slice(0, lineEnd);
+                if (options.TrimFields) headerSpan = Trim(headerSpan);
+
+                if (headerSpan.IsEmpty) throw new Exception("Header not found or is empty. Please check CSV format.");
+
+                var headerPositions = new List<(int Start, int Length)>();
+                ParseLine(headerSpan, headerPositions, options.Delimiter);
+
+                for (int i = 0; i < headerPositions.Count; i++)
+                {
+                    var posInfo = headerPositions[i];
+                    headerNames.Add(Trim(headerSpan.Slice(posInfo.Start, posInfo.Length)).ToString());
+                }
+            }
+
+            // データ行をループ
+            var rowPositions = new List<(int Start, int Length)>();
+            while (pos < length)
+            {
+                int start = pos;
+                int lineEnd = IndexOf(span, '\n', ref pos);
+                if (lineEnd < 0) lineEnd = length;
+
+                var lineSpan = span.Slice(start, lineEnd - start);
+                if (options.TrimFields) lineSpan = Trim(lineSpan);
+
+                if (options.IgnoreEmptyLines && lineSpan.IsEmpty) continue;
+                if (!string.IsNullOrEmpty(options.CommentPrefix) && lineSpan.StartsWith(options.CommentPrefix.AsSpan())) continue;
+
+                ParseLine(lineSpan, rowPositions, options.Delimiter);
+
+                // ヘッダーがなければ、行の列数チェックは行わない
+                if (options.HasHeader && rowPositions.Count != headerNames.Count)
+                {
+                    throw new Exception($"Column count mismatch: header has {headerNames.Count} columns, data row has {rowPositions.Count} columns.");
+                }
+
+                var row = new LineData();
+                for (int i = 0; i < rowPositions.Count; i++)
+                {
+                    var posInfo = rowPositions[i];
+                    var spanVal = lineSpan.Slice(posInfo.Start, posInfo.Length);
+                    if (options.TrimFields) spanVal = Trim(spanVal);
+
+                    if (options.HasHeader && i < headerNames.Count)
+                    {
+                        row.Add(headerNames[i], ParseValue(spanVal));
+                    }
+                    else
+                    {
+                        // ヘッダーがない場合はインデックスをキーとして扱う (例: "0", "1", "2"...)
+                        row.Add(i.ToString(), ParseValue(spanVal));
+                    }
+                }
+
+                result.Add(row);
+            }
+
+            Debug.Log($"Loaded CsvData ({result.Rows.Count} rows) from '{csvFile.name}'.");
+            return result;
+        }
+
         private static object ParseValue(ReadOnlySpan<char> span)
         {
             if (int.TryParse(span, out var i)) return i;
@@ -156,6 +242,7 @@ namespace CSV4Unity
                     {
                         inQuote = false;
                         positions.Add((start, i - start));
+
                         // クォートの後のスペースと区切り文字をスキップ
                         while (i + 1 < line.Length && char.IsWhiteSpace(line[i + 1])) i++;
                         if (i + 1 < line.Length && line[i + 1] == delimiter) i++;

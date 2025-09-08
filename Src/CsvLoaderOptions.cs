@@ -3,6 +3,9 @@ using System;
 
 namespace CSV4Unity
 {
+    /// <summary>
+    /// CSV ローダーのオプション設定
+    /// </summary>
     public sealed class CsvLoaderOptions
     {
         public char Delimiter { get; set; } = ',';
