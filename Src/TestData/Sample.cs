@@ -1,4 +1,6 @@
-﻿using System;
+﻿/*
+
+using System;
 using System.Diagnostics;
 using UnityEngine;
 using CSV4Unity.Fields;
@@ -127,3 +129,5 @@ namespace CSV4Unity.Test
         }
     }
 }
+
+*/
