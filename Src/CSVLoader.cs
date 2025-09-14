@@ -179,7 +179,7 @@ namespace CSV4Unity
                     }
                     else
                     {
-                        // ヘッダーがない場合はインデックスをキーとして扱う (例: "0", "1", "2"...)
+                        // ヘッダーがない場合はインデックスをキーとして扱う
                         row.Add(i.ToString(), ParseValue(spanVal));
                     }
                 }

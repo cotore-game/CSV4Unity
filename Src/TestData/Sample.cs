@@ -1,6 +1,4 @@
-﻿/*
-
-using System;
+﻿using System;
 using System.Diagnostics;
 using UnityEngine;
 using CSV4Unity.Fields;
@@ -14,7 +12,6 @@ namespace CSV4Unity.Test
     {
         [Header("読み込む CSV ファイル / CSV Files to Load")]
         [SerializeField] private TextAsset scenarioCsv;
-        [SerializeField] private TextAsset hugeDataCsv;
 
         private void Start()
         {
@@ -25,33 +22,25 @@ namespace CSV4Unity.Test
             //    Second argument sets data name for display (optional)
             // ────────────────
 
-            // ZeroAlloc版
             var sw = Stopwatch.StartNew();
             long memBefore = GC.GetTotalMemory(false);
+            var options = new CsvLoaderOptions
+            {
+                Delimiter = ',',
+                HasHeader = true,
+                CommentPrefix = "#",
+                TrimFields = true,
+                IgnoreEmptyLines = true,
+                MissingFieldPolicy = MissingFieldPolicy.Throw,
+                FormatProvider = System.Globalization.CultureInfo.InvariantCulture
+            };
 
-            var scenarioData = CSVLoader.LoadCSVSpan<ScenarioFields>(scenarioCsv, "MainScenario");
+            var scenarioData = CSVLoader.LoadCSV<ScenarioFields>(scenarioCsv, options, "MainScenario");
 
             sw.Stop();
             long memAfter = GC.GetTotalMemory(false);
             UnityEngine.Debug.Log(
                 $"[ZeroAlloc/Scenario] Loaded {scenarioData.Rows.Count} rows in {sw.ElapsedMilliseconds} ms, " +
-                $"Heap Δ = {memAfter - memBefore:N0} bytes"
-            );
-
-            // Split版（legacy）
-            // GCを一度クリアして同条件に
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-
-            sw.Restart();
-            memBefore = GC.GetTotalMemory(false);
-
-            var scenarioDataLegacy = CSVLoader.LoadCSV<ScenarioFields>(scenarioCsv, "MainScenario_Legacy");
-
-            sw.Stop();
-            memAfter = GC.GetTotalMemory(false);
-            UnityEngine.Debug.Log(
-                $"[Legacy/Scenario]    Loaded {scenarioDataLegacy.Rows.Count} rows in {sw.ElapsedMilliseconds} ms, " +
                 $"Heap Δ = {memAfter - memBefore:N0} bytes"
             );
 
@@ -65,69 +54,6 @@ namespace CSV4Unity.Test
                 var command = firstLine.Get<string>(ScenarioFields.Command);
                 UnityEngine.Debug.Log($"First scenario command: {command}");
             }
-
-            // ────────────────
-            // 2. EnemyFields を使って敵データを読み込み
-            // 2.Load enemy data using EnemyFields
-            // ────────────────
-
-            // ZeroAlloc版
-            sw.Restart();
-            memBefore = GC.GetTotalMemory(false);
-
-            var enemyData = CSVLoader.LoadCSVSpan<HugeDataFields>(hugeDataCsv, "HugeData");
-
-            sw.Stop();
-            memAfter = GC.GetTotalMemory(false);
-            UnityEngine.Debug.Log(
-                $"[ZeroAlloc/Enemy]    Loaded {enemyData.Rows.Count} rows in {sw.ElapsedMilliseconds} ms, " +
-                $"Heap Δ = {memAfter - memBefore:N0} bytes"
-            );
-
-            // Split版（legacy）
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-
-            sw.Restart();
-            memBefore = GC.GetTotalMemory(false);
-
-            var enemyDataLegacy = CSVLoader.LoadCSV<HugeDataFields>(hugeDataCsv, "HugeData_Legacy");
-
-            sw.Stop();
-            memAfter = GC.GetTotalMemory(false);
-            UnityEngine.Debug.Log(
-                $"[Legacy/Enemy]       Loaded {enemyDataLegacy.Rows.Count} rows in {sw.ElapsedMilliseconds} ms, " +
-                $"Heap Δ = {memAfter - memBefore:N0} bytes"
-            );
-
-            // 各行をループしてフィールド値を取得
-            // Loop through each row and get field values
-            foreach (var line in enemyData.Rows)
-            {
-                string a = line.Get<string>(HugeDataFields.a);
-                string b = line.Get<string>(HugeDataFields.b);
-                string c = line.Get<string>(HugeDataFields.c);
-                string d = line.Get<string>(HugeDataFields.d);
-                string e = line.Get<string>(HugeDataFields.e);
-                string f = line.Get<string>(HugeDataFields.f);
-                string g = line.Get<string>(HugeDataFields.g);
-                string h = line.Get<string>(HugeDataFields.h);
-                string i = line.Get<string>(HugeDataFields.i);
-                string j = line.Get<string>(HugeDataFields.j);
-                string k = line.Get<string>(HugeDataFields.k);
-                string l = line.Get<string>(HugeDataFields.l);
-                string m = line.Get<string>(HugeDataFields.m);
-                string n = line.Get<string>(HugeDataFields.n);
-                string o = line.Get<string>(HugeDataFields.o);
-                string p = line.Get<string>(HugeDataFields.p);
-                string q = line.Get<string>(HugeDataFields.q);
-                string r = line.Get<string>(HugeDataFields.r);
-                string s = line.Get<string>(HugeDataFields.s);
-                string t = line.Get<string>(HugeDataFields.t);
-                string u = line.Get<string>(HugeDataFields.u);
-            }
         }
     }
 }
-
-*/
