@@ -40,7 +40,7 @@ namespace CSV4Unity.Editor
             var savedEnumName = EditorPrefs.GetString($"CSV4Unity_SelectedEnum_{_csvFile?.name}", "");
             if (!string.IsNullOrEmpty(savedEnumName))
             {
-                var savedEnum = _availableEnums.FirstOrDefault(e => e.FullName == savedEnumName);
+                var savedEnum = _availableEnums?.FirstOrDefault(e => e.FullName == savedEnumName);
                 if (savedEnum != null)
                 {
                     _selectedEnumIndex = _availableEnums.IndexOf(savedEnum);
@@ -54,19 +54,10 @@ namespace CSV4Unity.Editor
             // デフォルトインスペクターを表示
             DrawDefaultInspector();
 
-            /*
-            // CSVファイルでない場合は何もしない
-            if (_csvFile == null || !_csvFile.name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-            */
-
             if (_csvFile == null)
             {
                 return;
             }
-            GUI.enabled = true;
 
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("CSV Validation", EditorStyles.boldLabel);
@@ -88,6 +79,7 @@ namespace CSV4Unity.Editor
                 if (GUILayout.Button("Refresh Enums"))
                 {
                     _availableEnums = FindEnumsInNamespace(FIELDS_NAMESPACE);
+                    Repaint();
                 }
                 return;
             }
@@ -96,8 +88,17 @@ namespace CSV4Unity.Editor
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Validation Schema:", GUILayout.Width(120));
 
-            var enumNames = _availableEnums.Select(e => e.Name).ToArray();
-            var newIndex = EditorGUILayout.Popup(_selectedEnumIndex, enumNames);
+            var enumNames = new string[_availableEnums.Count + 1];
+            enumNames[0] = "None (No validation)";
+            for (int i = 0; i < _availableEnums.Count; i++)
+            {
+                enumNames[i + 1] = _availableEnums[i].Name;
+            }
+
+            // インデックスを+1してオフセット（"None"を0番目に追加したため）
+            var displayIndex = _selectedEnumIndex + 1;
+            var newDisplayIndex = EditorGUILayout.Popup(displayIndex, enumNames);
+            var newIndex = newDisplayIndex - 1;
 
             if (newIndex != _selectedEnumIndex)
             {
@@ -111,6 +112,12 @@ namespace CSV4Unity.Editor
                 {
                     EditorPrefs.SetString($"CSV4Unity_SelectedEnum_{_csvFile.name}", _selectedEnumType.FullName);
                 }
+                else
+                {
+                    EditorPrefs.DeleteKey($"CSV4Unity_SelectedEnum_{_csvFile.name}");
+                }
+
+                Repaint();
             }
             EditorGUILayout.EndHorizontal();
 
@@ -248,23 +255,61 @@ namespace CSV4Unity.Editor
                 {
                     HasHeader = true,
                     TrimFields = true,
-                    IgnoreEmptyLines = true
+                    IgnoreEmptyLines = true,
+                    ValidationEnabled = false  // エディタでの手動バリデーション時は無効化
                 };
 
                 // リフレクションを使ってLoadCSVを呼び出し
                 var loaderType = typeof(CSVLoader);
-                var loadMethod = loaderType.GetMethod("LoadCSV", new[] { typeof(TextAsset), typeof(CsvLoaderOptions), typeof(string) });
-                var genericMethod = loadMethod.MakeGenericMethod(_selectedEnumType);
 
+                // ジェネリック版のLoadCSVメソッドを明示的に取得
+                var methods = loaderType.GetMethods(BindingFlags.Public | BindingFlags.Static);
+                MethodInfo loadMethod = null;
+
+                foreach (var method in methods)
+                {
+                    if (method.Name == "LoadCSV" &&
+                        method.IsGenericMethodDefinition &&
+                        method.GetParameters().Length == 3)
+                    {
+                        loadMethod = method;
+                        break;
+                    }
+                }
+
+                if (loadMethod == null)
+                {
+                    throw new Exception("LoadCSV generic method not found");
+                }
+
+                var genericMethod = loadMethod.MakeGenericMethod(_selectedEnumType);
                 var csvData = genericMethod.Invoke(null, new object[] { _csvFile, options, null });
 
                 EditorUtility.DisplayProgressBar("CSV Validation", "Validating data...", 0.6f);
 
                 // バリデーション実行
                 var validatorType = typeof(CsvValidator);
-                var validateMethod = validatorType.GetMethod("Validate", new[] { csvData.GetType() });
+                var validateMethods = validatorType.GetMethods(BindingFlags.Public | BindingFlags.Static);
+                MethodInfo validateMethod = null;
 
-                _validationResult = (CsvValidationResult)validateMethod.Invoke(null, new[] { csvData });
+                foreach (var method in validateMethods)
+                {
+                    if (method.Name == "Validate" &&
+                        method.IsGenericMethodDefinition &&
+                        method.GetParameters().Length == 1)
+                    {
+                        validateMethod = method;
+                        break;
+                    }
+                }
+
+                if (validateMethod == null)
+                {
+                    throw new Exception("Validate generic method not found");
+                }
+
+                var genericValidateMethod = validateMethod.MakeGenericMethod(_selectedEnumType);
+                _validationResult = (CsvValidationResult)genericValidateMethod.Invoke(null, new[] { csvData });
                 _showValidationResults = true;
 
                 EditorUtility.ClearProgressBar();
@@ -283,9 +328,14 @@ namespace CSV4Unity.Editor
             {
                 EditorUtility.ClearProgressBar();
                 _validationResult = new CsvValidationResult();
-                _validationResult.AddError(0, "System", $"Validation error: {ex.Message}");
+
+                // 内部例外を取得（リフレクション呼び出しの場合）
+                var innerException = ex.InnerException ?? ex;
+                _validationResult.AddError(0, "System", $"Validation error: {innerException.Message}");
                 _showValidationResults = true;
-                Debug.LogError($"Validation exception: {ex}");
+
+                Debug.LogError($"Validation exception: {innerException}");
+                Debug.LogError($"Stack trace: {innerException.StackTrace}");
             }
         }
 
@@ -374,6 +424,7 @@ namespace CSV4Unity.Editor
             {
                 _validationResult = null;
                 _showValidationResults = false;
+                Repaint();
             }
             EditorGUILayout.EndHorizontal();
 
