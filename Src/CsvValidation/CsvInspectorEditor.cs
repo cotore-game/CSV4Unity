@@ -37,14 +37,17 @@ namespace CSV4Unity.Editor
             _availableEnums = FindEnumsInNamespace(FIELDS_NAMESPACE);
 
             // 前回選択されたEnumを復元（EditorPrefs使用）
-            var savedEnumName = EditorPrefs.GetString($"CSV4Unity_SelectedEnum_{_csvFile?.name}", "");
-            if (!string.IsNullOrEmpty(savedEnumName))
+            if (_csvFile != null)
             {
-                var savedEnum = _availableEnums?.FirstOrDefault(e => e.FullName == savedEnumName);
-                if (savedEnum != null)
+                var savedEnumName = EditorPrefs.GetString($"CSV4Unity_SelectedEnum_{_csvFile.name}", "");
+                if (!string.IsNullOrEmpty(savedEnumName) && _availableEnums != null)
                 {
-                    _selectedEnumIndex = _availableEnums.IndexOf(savedEnum);
-                    _selectedEnumType = savedEnum;
+                    var savedEnum = _availableEnums.FirstOrDefault(e => e.FullName == savedEnumName);
+                    if (savedEnum != null)
+                    {
+                        _selectedEnumIndex = _availableEnums.IndexOf(savedEnum);
+                        _selectedEnumType = savedEnum;
+                    }
                 }
             }
         }
@@ -60,6 +63,12 @@ namespace CSV4Unity.Editor
             }
 
             EditorGUILayout.Space(10);
+
+            // セパレータ
+            var rect = EditorGUILayout.GetControlRect(false, 1);
+            EditorGUI.DrawRect(rect, new Color(0.5f, 0.5f, 0.5f, 1));
+
+            EditorGUILayout.Space(5);
             EditorGUILayout.LabelField("CSV Validation", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
                 "CSV4Unity.Fields名前空間にEnum型を定義することで、\n" +
@@ -79,31 +88,48 @@ namespace CSV4Unity.Editor
                 if (GUILayout.Button("Refresh Enums"))
                 {
                     _availableEnums = FindEnumsInNamespace(FIELDS_NAMESPACE);
+                    _selectedEnumIndex = -1;
+                    _selectedEnumType = null;
                     Repaint();
                 }
                 return;
             }
 
-            // Enum選択ドロップダウン
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Validation Schema:", GUILayout.Width(120));
+            // Enum選択ドロップダウン（確実に有効化）
+            EditorGUILayout.Space(5);
 
-            var enumNames = new string[_availableEnums.Count + 1];
-            enumNames[0] = "None (No validation)";
+            // 選択肢を作成
+            string[] popupOptions = new string[_availableEnums.Count + 1];
+            popupOptions[0] = "None (No validation)";
             for (int i = 0; i < _availableEnums.Count; i++)
             {
-                enumNames[i + 1] = _availableEnums[i].Name;
+                popupOptions[i + 1] = _availableEnums[i].Name;
             }
 
-            // インデックスを+1してオフセット（"None"を0番目に追加したため）
-            var displayIndex = _selectedEnumIndex + 1;
-            var newDisplayIndex = EditorGUILayout.Popup(displayIndex, enumNames);
-            var newIndex = newDisplayIndex - 1;
+            // 現在の選択インデックス（+1はNoneのオフセット）
+            int currentPopupIndex = _selectedEnumIndex + 1;
 
-            if (newIndex != _selectedEnumIndex)
+            // GUIの状態を確実に有効化
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled = true;
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.PrefixLabel("Validation Schema:");
+
+            // Popupを表示
+            int newPopupIndex = EditorGUILayout.Popup(currentPopupIndex, popupOptions);
+
+            EditorGUILayout.EndHorizontal();
+
+            // GUIの状態を復元
+            GUI.enabled = wasEnabled;
+
+            // 選択が変更された場合
+            if (newPopupIndex != currentPopupIndex)
             {
-                _selectedEnumIndex = newIndex;
-                _selectedEnumType = newIndex >= 0 ? _availableEnums[newIndex] : null;
+                int newEnumIndex = newPopupIndex - 1;
+                _selectedEnumIndex = newEnumIndex;
+                _selectedEnumType = newEnumIndex >= 0 ? _availableEnums[newEnumIndex] : null;
                 _validationResult = null;
                 _showValidationResults = false;
 
@@ -111,15 +137,16 @@ namespace CSV4Unity.Editor
                 if (_selectedEnumType != null)
                 {
                     EditorPrefs.SetString($"CSV4Unity_SelectedEnum_{_csvFile.name}", _selectedEnumType.FullName);
+                    Debug.Log($"Selected validation schema: {_selectedEnumType.Name}");
                 }
                 else
                 {
                     EditorPrefs.DeleteKey($"CSV4Unity_SelectedEnum_{_csvFile.name}");
+                    Debug.Log("Validation schema cleared");
                 }
 
                 Repaint();
             }
-            EditorGUILayout.EndHorizontal();
 
             // 選択されたEnumの制約情報を表示
             if (_selectedEnumType != null)
@@ -127,16 +154,29 @@ namespace CSV4Unity.Editor
                 EditorGUILayout.Space(5);
                 DisplayEnumConstraints(_selectedEnumType);
             }
+            else
+            {
+                EditorGUILayout.Space(5);
+                EditorGUILayout.HelpBox("バリデーションスキーマが選択されていません。", MessageType.Info);
+            }
 
             EditorGUILayout.Space(10);
 
             // バリデーション実行ボタン
-            GUI.enabled = _selectedEnumType != null;
+            bool canValidate = _selectedEnumType != null;
+            GUI.enabled = canValidate;
+
             if (GUILayout.Button("Validate CSV", GUILayout.Height(30)))
             {
                 ExecuteValidation();
             }
+
             GUI.enabled = true;
+
+            if (!canValidate)
+            {
+                EditorGUILayout.HelpBox("バリデーションを実行するには、Validation Schemaを選択してください。", MessageType.Warning);
+            }
 
             // バリデーション結果の表示
             if (_showValidationResults && _validationResult != null)
@@ -153,26 +193,47 @@ namespace CSV4Unity.Editor
         {
             var enumTypes = new List<Type>();
 
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (var assembly in assemblies)
+            try
             {
-                try
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                foreach (var assembly in assemblies)
                 {
-                    var types = assembly.GetTypes();
-                    foreach (var type in types)
+                    try
                     {
-                        if (type.IsEnum &&
-                            type.Namespace != null &&
-                            type.Namespace.StartsWith(namespaceName))
+                        var types = assembly.GetTypes();
+                        foreach (var type in types)
                         {
-                            enumTypes.Add(type);
+                            if (type.IsEnum &&
+                                type.Namespace != null &&
+                                type.Namespace.StartsWith(namespaceName))
+                            {
+                                enumTypes.Add(type);
+                            }
                         }
                     }
+                    catch (ReflectionTypeLoadException ex)
+                    {
+                        // 一部の型のロードに失敗しても続行
+                        foreach (var loadedType in ex.Types)
+                        {
+                            if (loadedType != null &&
+                                loadedType.IsEnum &&
+                                loadedType.Namespace != null &&
+                                loadedType.Namespace.StartsWith(namespaceName))
+                            {
+                                enumTypes.Add(loadedType);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // その他のアセンブリエラーは無視
+                    }
                 }
-                catch
-                {
-                    // アセンブリの読み込みエラーは無視
-                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error finding enums: {ex.Message}");
             }
 
             return enumTypes.OrderBy(t => t.Name).ToList();
