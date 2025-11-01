@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using CSV4Unity.Validation;
+using System.Linq;
 
 namespace CSV4Unity
 {
@@ -16,7 +18,7 @@ namespace CSV4Unity
         /// <param name="dataName">データの識別名。nullの場合はファイル名を使用</param>
         /// <returns>パースされたCSVデータ</returns>
         /// <exception cref="ArgumentNullException">csvFileがnullの場合</exception>
-        /// <exception cref="Exception">CSVの形式が不正な場合</exception>
+        /// <exception cref="Exception">CSVの形式が不正な場合、またはバリデーションエラーの場合</exception>
         public static CsvData<TEnum> LoadCSV<TEnum>(TextAsset csvFile, CsvLoaderOptions options = null, string dataName = null)
             where TEnum : struct, Enum
         {
@@ -127,6 +129,40 @@ namespace CSV4Unity
             }
 
             Debug.Log($"Loaded CsvData<{typeof(TEnum).Name}> ({result.Rows.Count} rows) from '{csvFile.name}'.");
+
+            // 自動バリデーション
+            if (options.ValidationEnabled)
+            {
+                var validationResult = CsvValidator.Validate(result);
+
+                if (!validationResult.IsValid)
+                {
+                    var errorSummary = $"CSV Validation failed for '{csvFile.name}':\n";
+                    foreach (var error in validationResult.Errors.Take(5))  // 最初の5件のみ表示
+                    {
+                        errorSummary += $"  - {error}\n";
+                    }
+
+                    if (validationResult.Errors.Count > 5)
+                    {
+                        errorSummary += $"  ... and {validationResult.Errors.Count - 5} more errors\n";
+                    }
+
+                    if (options.ThrowOnValidationError)
+                    {
+                        throw new CsvValidationException($"CSV validation failed with {validationResult.Errors.Count} error(s). See console for details.", validationResult);
+                    }
+                    else
+                    {
+                        Debug.LogError(errorSummary);
+                    }
+                }
+                else
+                {
+                    Debug.Log($"<color=green>✓</color> CSV validation passed for '{csvFile.name}'");
+                }
+            }
+
             return result;
         }
 
@@ -255,6 +291,9 @@ namespace CSV4Unity
             }
 
             Debug.Log($"Loaded CsvData ({result.Rows.Count} rows, {columnCount} columns) from '{csvFile.name}'.");
+
+            // 非ジェネリック版では自動バリデーションは行わない（Enumが必要なため）
+
             return result;
         }
 
@@ -392,6 +431,20 @@ namespace CSV4Unity
             while (start <= end && char.IsWhiteSpace(s[start])) start++;
             while (end >= start && char.IsWhiteSpace(s[end])) end--;
             return start <= end ? s.Slice(start, end - start + 1) : ReadOnlySpan<char>.Empty;
+        }
+    }
+
+    /// <summary>
+    /// CSVバリデーションエラー専用例外
+    /// </summary>
+    public class CsvValidationException : Exception
+    {
+        public CsvValidationResult ValidationResult { get; }
+
+        public CsvValidationException(string message, CsvValidationResult validationResult)
+            : base(message)
+        {
+            ValidationResult = validationResult;
         }
     }
 }
