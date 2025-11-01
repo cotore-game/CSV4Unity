@@ -1,5 +1,6 @@
 ﻿// 扱いたい CSV のヘッダーを定義します。
 // Define CSV headers you want to handle.
+using CSV4Unity.Validation;
 
 namespace CSV4Unity.Fields
 {
