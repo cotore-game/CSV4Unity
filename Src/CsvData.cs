@@ -182,6 +182,19 @@ namespace CSV4Unity
             for (int i = 0; i < column.Count; i++)
             {
                 var value = column[i];
+
+                // nullはインデックスに含めない
+                if (value == null)
+                {
+                    continue;
+                }
+
+                // 空文字列もスキップ
+                if (value is string str && string.IsNullOrEmpty(str))
+                {
+                    continue;
+                }
+
                 if (!index.TryGetValue(value, out var list))
                 {
                     list = new List<int>();
@@ -512,6 +525,19 @@ namespace CSV4Unity
             for (int i = 0; i < column.Count; i++)
             {
                 var value = column[i];
+
+                // nullはインデックスに含めない
+                if (value == null)
+                {
+                    continue;
+                }
+
+                // 空文字列もスキップ
+                if (value is string str && string.IsNullOrEmpty(str))
+                {
+                    continue;
+                }
+
                 if (!index.TryGetValue(value, out var list))
                 {
                     list = new List<int>();
