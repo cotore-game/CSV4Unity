@@ -1,5 +1,22 @@
 Command,Arg1,Arg2,Arg3,Arg4,Arg5,Arg6,WaitType,Text,PageCtrl,Voice,WindowType,English
-ShowCharacter,Hero,Center,,,,,Fast,,,Normal,,
-PlaySound,BGM_Battle,,,,,,Normal,,Next,BattleTheme,,
-Dialogue,,,,,,Normal,,,Popup,Enemy is closing in!,,
-HideCharacter,Hero,,,,,,,Normal,,Next,,FadeOut
+Bg,307_shadow,0.5,,,,,,,,,,
+PlayBGM,TestBGM,,,,,,TRUE,,FadeOut,,,
+Text,,20,100,,,,,Test-4,,,,English-4
+Text,,20,100,,,,,Test-5,,,,English-5
+Text,,20,100,,,,,Test-6,,,,English-6
+Bg,307_normal,0.5,,,,,,,,,,
+Text,,20,100,,,,,Test-8,,,,English-8
+Bg,307_surprise,0.5,,,,,,,instant,,,
+Text,,20,100,,,,,Test-10,,,,English-10
+Text,,20,100,,,,,Test-11,,,,English-11
+Character,PeopleA,PeopleB,,,,,,,,VoiceA,,
+Text,,20,100,,,,,Test-13,,,,English-13
+Text,,20,100,,,,,Test-14,,,,English-14
+Bg,307_surprise,0.5,,,,,,,instant,,,
+#CameraShake,,5,3,,,,,,,,,
+Bg,302,1,,,,,,,,,,
+Text,,20,100,,,,,Test-18,,,,English-18
+PlaySE,TestSE,,,,,,,,,,,
+Text,,20,100,,,,,,,,,
+#Fade,1.5,,,,,,,,,,,
+Wait,500,,,,,,,,,,,
