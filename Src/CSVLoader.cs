@@ -297,15 +297,48 @@ namespace CSV4Unity
             return result;
         }
 
+        /// <summary>
+        /// 値を適切な型にパースします（精度を保つように改善）
+        /// </summary>
         private static object ParseValue(ReadOnlySpan<char> span, CsvLoaderOptions options)
         {
             if (span.IsEmpty) return null;
 
-            // 数値解析にFormatProviderを使用
-            if (int.TryParse(span, System.Globalization.NumberStyles.Integer, options.FormatProvider, out var i)) return i;
-            if (float.TryParse(span, System.Globalization.NumberStyles.Float, options.FormatProvider, out var f)) return f;
+            // bool解析を最初に試行（true/falseを優先）
             if (bool.TryParse(span, out var b)) return b;
 
+            // 小数点が含まれているかチェック
+            bool hasDecimalPoint = false;
+            for (int i = 0; i < span.Length; i++)
+            {
+                if (span[i] == '.')
+                {
+                    hasDecimalPoint = true;
+                    break;
+                }
+            }
+
+            // 小数点がない場合のみint解析を試行（精度損失を防ぐ）
+            if (!hasDecimalPoint)
+            {
+                if (int.TryParse(span, System.Globalization.NumberStyles.Integer, options.FormatProvider, out var i))
+                {
+                    return i;
+                }
+                // intでオーバーフローする場合はlong解析も試行
+                if (long.TryParse(span, System.Globalization.NumberStyles.Integer, options.FormatProvider, out var l))
+                {
+                    return l;
+                }
+            }
+
+            // 小数点がある、またはint/long解析に失敗した場合はfloat解析
+            if (float.TryParse(span, System.Globalization.NumberStyles.Float, options.FormatProvider, out var f))
+            {
+                return f;
+            }
+
+            // すべて失敗した場合は文字列として返す
             return span.ToString();
         }
 
@@ -343,6 +376,9 @@ namespace CSV4Unity
             return span.Slice(0, end + 1);
         }
 
+        /// <summary>
+        /// 1行を解析してフィールド位置のリストを作成します（クォート処理を改善）
+        /// </summary>
         private static void ParseLine(ReadOnlySpan<char> line, List<(int Start, int Length)> positions, char delimiter)
         {
             positions.Clear();
@@ -375,24 +411,31 @@ namespace CSV4Unity
                     // クォートが閉じる
                     else if (inQuote)
                     {
+                        // フィールド値を追加（クォート内の内容）
                         positions.Add((start, i - start));
                         inQuote = false;
 
-                        // クォート後のデリミタまでスキップ
-                        i++;
-                        while (i < line.Length && line[i] != delimiter) i++;
+                        // 【修正】クォート閉じ後の処理を簡潔化
+                        // 次の文字がデリミタか行末かチェック
+                        i++; // 閉じクォートの次へ
 
+                        // デリミタまたは行末まで進む
+                        while (i < line.Length && line[i] != delimiter)
+                        {
+                            i++;
+                        }
+
+                        // デリミタが見つかった場合、次のフィールドの開始位置を設定
                         if (i < line.Length && line[i] == delimiter)
                         {
                             start = i + 1;
                         }
                         else
                         {
+                            // 行末に到達
                             start = line.Length;
+                            i--; // forループのi++で調整されるため
                         }
-
-                        // ループの最後でi++されるので、ここでi--して調整
-                        i--;
                     }
                 }
                 else if (c == delimiter && !inQuote)
