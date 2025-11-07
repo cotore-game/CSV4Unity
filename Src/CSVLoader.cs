@@ -38,7 +38,7 @@ namespace CSV4Unity
             int enumCount = Enum.GetValues(typeof(TEnum)).Length;
             var enumValues = (TEnum[])Enum.GetValues(typeof(TEnum));
             var enumToIndex = new int[enumCount];
-            var headerSpan = ReadOnlySpan<char>.Empty;
+            ReadOnlySpan<char> headerSpan = ReadOnlySpan<char>.Empty;
 
             if (options.HasHeader)
             {
