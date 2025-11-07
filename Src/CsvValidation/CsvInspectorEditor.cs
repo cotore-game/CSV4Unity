@@ -225,9 +225,9 @@ namespace CSV4Unity.Editor
                             }
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // その他のアセンブリエラーは無視
+                        Debug.LogWarning($"列挙型の検出中にアセンブリエラーが発生しました: {ex.Message} \n {ex.StackTrace}");
                     }
                 }
             }
