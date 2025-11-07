@@ -1,0 +1,21 @@
+{
+    "name": "CSV4Unity.Tests",
+    "rootNamespace": "",
+    "references": [
+        "GUID:3e262cca1d95c2a4eaf416fc2d392fbb",
+        "GUID:6b4d0642f3dc52f41a476a57294b6d80"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
