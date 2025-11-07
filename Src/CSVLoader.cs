@@ -616,6 +616,9 @@ namespace CSV4Unity
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ReadOnlySpan<char> Trim(ReadOnlySpan<char> s)
         {
+            // 空のスパンは早期リターン
+            if (s.IsEmpty) return ReadOnlySpan<char>.Empty;
+
             int start = 0, end = s.Length - 1;
             while (start <= end && char.IsWhiteSpace(s[start])) start++;
             while (end >= start && char.IsWhiteSpace(s[end])) end--;
