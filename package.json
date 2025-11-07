@@ -1,0 +1,20 @@
+{
+  "name": "com.cotore.csv4unity",
+  "displayName": "CSV4Unity",
+  "author": { 
+    "name": "cotore", 
+    "url": "https://github.com/cotore-game" 
+  },
+  "version": "0.1.0",
+  "unity": "6000.0",
+  "description": "A high-performance, type-safe CSV loader library for Unity.",
+  "keywords": [ 
+    "csv", 
+    "data", 
+    "validation", 
+    "utility" 
+  ],
+  "license": "MIT",
+  "category": "Utility",
+  "dependencies": {}
+}
