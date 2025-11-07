@@ -450,17 +450,17 @@ namespace CSV4Unity
             /// <summary>
             /// フィールドの開始位置
             /// </summary>
-            public int Start;
+            public readonly int Start;
 
             /// <summary>
             /// フィールドの長さ
             /// </summary>
-            public int Length;
+            public readonly int Length;
 
             /// <summary>
             /// エスケープ処理済みの文字列（エスケープが不要な場合はnull）
             /// </summary>
-            public string UnescapedString;
+            public readonly string UnescapedString;
 
             public FieldInfo(int start, int length, string unescaped = null)
             {
