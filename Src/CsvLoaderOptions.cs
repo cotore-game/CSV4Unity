@@ -53,5 +53,10 @@ namespace CSV4Unity
         /// ValidationEnabledがtrueの場合のみ有効
         /// </summary>
         public bool ThrowOnValidationError { get; set; } = true;
+
+        /// <summary>
+        /// 表示するエラーの最大数（デフォルト: 5）
+        /// </summary>
+        public int MAX_DISPLAYED_ERRORS { get; set; } = 5;
     }
 }

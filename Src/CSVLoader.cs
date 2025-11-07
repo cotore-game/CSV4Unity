@@ -153,14 +153,15 @@ namespace CSV4Unity
                 if (!validationResult.IsValid)
                 {
                     var errorSummary = $"CSV Validation failed for '{csvFile.name}':\n";
-                    foreach (var error in validationResult.Errors.Take(5))  // 最初の5件のみ表示
+                    // 最大表示数までエラーを列挙
+                    foreach (var error in validationResult.Errors.Take(options.MAX_DISPLAYED_ERRORS))
                     {
                         errorSummary += $"  - {error}\n";
                     }
 
-                    if (validationResult.Errors.Count > 5)
+                    if (validationResult.Errors.Count > options.MAX_DISPLAYED_ERRORS)
                     {
-                        errorSummary += $"  ... and {validationResult.Errors.Count - 5} more errors\n";
+                        errorSummary += $"  ... and {validationResult.Errors.Count - options.MAX_DISPLAYED_ERRORS} more errors\n";
                     }
 
                     if (options.ThrowOnValidationError)
