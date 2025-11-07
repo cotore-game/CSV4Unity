@@ -43,9 +43,7 @@ A high-performance, type-safe CSV loader library for Unity. It provides practica
     
 
 ```
-
-https://github.com/cotore-game/CSV4Unity.git
-
+https://github.com/cotore-game/CSV4Unity.git?path=Assets/Plugins/CSVLoader
 ```
 
 ### UnityPackage (Alternative)
