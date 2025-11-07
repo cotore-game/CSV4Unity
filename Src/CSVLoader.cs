@@ -4,9 +4,13 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 using CSV4Unity.Validation;
 using System.Linq;
+using System.Text;
 
 namespace CSV4Unity
 {
+    /// <summary>
+    /// CSVファイルの読み込みとパース機能を提供する静的クラス
+    /// </summary>
     public static class CSVLoader
     {
         /// <summary>
@@ -30,7 +34,7 @@ namespace CSV4Unity
             int pos = 0;
             int length = span.Length;
 
-            List<(int Start, int Length)> headerPositions = new();
+            List<FieldInfo> headerFields = new();
             int enumCount = Enum.GetValues(typeof(TEnum)).Length;
             var enumValues = (TEnum[])Enum.GetValues(typeof(TEnum));
             var enumToIndex = new int[enumCount];
@@ -50,12 +54,12 @@ namespace CSV4Unity
 
                 if (headerSpan.IsEmpty) throw new Exception("Header not found or is empty. Please check CSV format.");
 
-                ParseLine(headerSpan, headerPositions, options.Delimiter);
+                ParseLine(headerSpan, headerFields, options.Delimiter);
 
                 for (int i = 0; i < enumCount; i++)
                 {
                     var nameSpan = enumValues[i].ToString().AsSpan();
-                    enumToIndex[i] = FindColumnIndex(nameSpan, headerPositions, headerSpan);
+                    enumToIndex[i] = FindColumnIndex(nameSpan, headerFields, headerSpan);
                 }
             }
             else
@@ -70,7 +74,7 @@ namespace CSV4Unity
             var result = new CsvData<TEnum> { DataName = string.IsNullOrEmpty(dataName) ? csvFile.name : dataName };
             result.Initialize();
 
-            var rowPositions = new List<(int Start, int Length)>();
+            var rowFields = new List<FieldInfo>();
 
             // データ行をループ
             while (pos < length)
@@ -89,14 +93,14 @@ namespace CSV4Unity
                 if (options.IgnoreEmptyLines && lineSpan.IsEmpty) continue;
                 if (!string.IsNullOrEmpty(options.CommentPrefix) && lineSpan.StartsWith(options.CommentPrefix.AsSpan())) continue;
 
-                ParseLine(lineSpan, rowPositions, options.Delimiter);
+                ParseLine(lineSpan, rowFields, options.Delimiter);
 
-                if (options.HasHeader && rowPositions.Count != headerPositions.Count)
+                if (options.HasHeader && rowFields.Count != headerFields.Count)
                 {
-                    Debug.LogWarning($"Column count mismatch at row {result.RowCount + 1}: header has {headerPositions.Count} columns, data row has {rowPositions.Count} columns.");
+                    Debug.LogWarning($"Column count mismatch at row {result.RowCount + 1}: header has {headerFields.Count} columns, data row has {rowFields.Count} columns.");
                     if (options.MissingFieldPolicy == MissingFieldPolicy.Throw)
                     {
-                        throw new Exception($"Column count mismatch: header has {headerPositions.Count} columns, data row has {rowPositions.Count} columns.");
+                        throw new Exception($"Column count mismatch: header has {headerFields.Count} columns, data row has {rowFields.Count} columns.");
                     }
                 }
 
@@ -104,7 +108,7 @@ namespace CSV4Unity
                 for (int i = 0; i < enumCount; i++)
                 {
                     var colIndex = enumToIndex[i];
-                    if (colIndex >= rowPositions.Count || colIndex < 0)
+                    if (colIndex >= rowFields.Count || colIndex < 0)
                     {
                         if (options.MissingFieldPolicy == MissingFieldPolicy.Throw)
                         {
@@ -118,8 +122,19 @@ namespace CSV4Unity
                         continue;
                     }
 
-                    var posInfo = rowPositions[colIndex];
-                    var spanVal = lineSpan.Slice(posInfo.Start, posInfo.Length);
+                    var fieldInfo = rowFields[colIndex];
+
+                    // エスケープ済み文字列がある場合はそれを使用、なければSpanから取得
+                    ReadOnlySpan<char> spanVal;
+                    if (fieldInfo.UnescapedString != null)
+                    {
+                        spanVal = fieldInfo.UnescapedString.AsSpan();
+                    }
+                    else
+                    {
+                        spanVal = lineSpan.Slice(fieldInfo.Start, fieldInfo.Length);
+                    }
+
                     if (options.TrimFields) spanVal = Trim(spanVal);
 
                     row[enumValues[i]] = ParseValue(spanVal, options);
@@ -202,13 +217,25 @@ namespace CSV4Unity
 
                 if (headerSpan.IsEmpty) throw new Exception("Header not found or is empty. Please check CSV format.");
 
-                var headerPositions = new List<(int Start, int Length)>();
-                ParseLine(headerSpan, headerPositions, options.Delimiter);
+                var headerFields = new List<FieldInfo>();
+                ParseLine(headerSpan, headerFields, options.Delimiter);
 
-                for (int i = 0; i < headerPositions.Count; i++)
+                for (int i = 0; i < headerFields.Count; i++)
                 {
-                    var posInfo = headerPositions[i];
-                    headerNames.Add(Trim(headerSpan.Slice(posInfo.Start, posInfo.Length)).ToString());
+                    var fieldInfo = headerFields[i];
+
+                    // エスケープ済み文字列がある場合はそれを使用、なければSpanから取得
+                    ReadOnlySpan<char> fieldValue;
+                    if (fieldInfo.UnescapedString != null)
+                    {
+                        fieldValue = fieldInfo.UnescapedString.AsSpan();
+                    }
+                    else
+                    {
+                        fieldValue = headerSpan.Slice(fieldInfo.Start, fieldInfo.Length);
+                    }
+
+                    headerNames.Add(Trim(fieldValue).ToString());
                 }
 
                 result.SetHeaders(headerNames);
@@ -224,9 +251,9 @@ namespace CSV4Unity
                 firstLineSpan = TrimLineEnd(firstLineSpan);
                 if (options.TrimFields) firstLineSpan = Trim(firstLineSpan);
 
-                var tempPositions = new List<(int Start, int Length)>();
-                ParseLine(firstLineSpan, tempPositions, options.Delimiter);
-                columnCount = tempPositions.Count;
+                var tempFields = new List<FieldInfo>();
+                ParseLine(firstLineSpan, tempFields, options.Delimiter);
+                columnCount = tempFields.Count;
 
                 result.SetColumnCount(columnCount);
 
@@ -235,7 +262,7 @@ namespace CSV4Unity
             }
 
             // データ行をループ
-            var rowPositions = new List<(int Start, int Length)>();
+            var rowFields = new List<FieldInfo>();
             while (pos < length)
             {
                 int start = pos;
@@ -250,15 +277,15 @@ namespace CSV4Unity
                 if (options.IgnoreEmptyLines && lineSpan.IsEmpty) continue;
                 if (!string.IsNullOrEmpty(options.CommentPrefix) && lineSpan.StartsWith(options.CommentPrefix.AsSpan())) continue;
 
-                ParseLine(lineSpan, rowPositions, options.Delimiter);
+                ParseLine(lineSpan, rowFields, options.Delimiter);
 
                 // 列数チェック
-                if (rowPositions.Count != columnCount)
+                if (rowFields.Count != columnCount)
                 {
-                    Debug.LogWarning($"Column count mismatch at row {result.RowCount + 1}: expected {columnCount} columns, got {rowPositions.Count} columns.");
+                    Debug.LogWarning($"Column count mismatch at row {result.RowCount + 1}: expected {columnCount} columns, got {rowFields.Count} columns.");
                     if (options.MissingFieldPolicy == MissingFieldPolicy.Throw)
                     {
-                        throw new Exception($"Column count mismatch: expected {columnCount} columns, data row has {rowPositions.Count} columns.");
+                        throw new Exception($"Column count mismatch: expected {columnCount} columns, data row has {rowFields.Count} columns.");
                     }
                 }
 
@@ -267,10 +294,21 @@ namespace CSV4Unity
                 if (options.HasHeader)
                 {
                     // ヘッダーありの場合
-                    for (int i = 0; i < rowPositions.Count && i < headerNames.Count; i++)
+                    for (int i = 0; i < rowFields.Count && i < headerNames.Count; i++)
                     {
-                        var posInfo = rowPositions[i];
-                        var spanVal = lineSpan.Slice(posInfo.Start, posInfo.Length);
+                        var fieldInfo = rowFields[i];
+
+                        // エスケープ済み文字列がある場合はそれを使用、なければSpanから取得
+                        ReadOnlySpan<char> spanVal;
+                        if (fieldInfo.UnescapedString != null)
+                        {
+                            spanVal = fieldInfo.UnescapedString.AsSpan();
+                        }
+                        else
+                        {
+                            spanVal = lineSpan.Slice(fieldInfo.Start, fieldInfo.Length);
+                        }
+
                         if (options.TrimFields) spanVal = Trim(spanVal);
                         row.Add(headerNames[i], ParseValue(spanVal, options), i);
                     }
@@ -278,10 +316,21 @@ namespace CSV4Unity
                 else
                 {
                     // ヘッダーなしの場合（インデックスベース）
-                    for (int i = 0; i < rowPositions.Count; i++)
+                    for (int i = 0; i < rowFields.Count; i++)
                     {
-                        var posInfo = rowPositions[i];
-                        var spanVal = lineSpan.Slice(posInfo.Start, posInfo.Length);
+                        var fieldInfo = rowFields[i];
+
+                        // エスケープ済み文字列がある場合はそれを使用、なければSpanから取得
+                        ReadOnlySpan<char> spanVal;
+                        if (fieldInfo.UnescapedString != null)
+                        {
+                            spanVal = fieldInfo.UnescapedString.AsSpan();
+                        }
+                        else
+                        {
+                            spanVal = lineSpan.Slice(fieldInfo.Start, fieldInfo.Length);
+                        }
+
                         if (options.TrimFields) spanVal = Trim(spanVal);
                         row.AddByIndex(i, ParseValue(spanVal, options));
                     }
@@ -298,8 +347,12 @@ namespace CSV4Unity
         }
 
         /// <summary>
-        /// 値を適切な型にパースします（精度を保つように改善）
+        /// 値を適切な型にパースします
+        /// 型の優先順位: bool → int → long → float → string
         /// </summary>
+        /// <param name="span">パース対象の文字列スパン</param>
+        /// <param name="options">ローダーオプション（数値解析用のFormatProviderを含む）</param>
+        /// <returns>パースされた値。空の場合はnull</returns>
         private static object ParseValue(ReadOnlySpan<char> span, CsvLoaderOptions options)
         {
             if (span.IsEmpty) return null;
@@ -307,7 +360,7 @@ namespace CSV4Unity
             // bool解析を最初に試行（true/falseを優先）
             if (bool.TryParse(span, out var b)) return b;
 
-            // 小数点が含まれているかチェック
+            // 小数点が含まれているかチェック（精度損失を防ぐため）
             bool hasDecimalPoint = false;
             for (int i = 0; i < span.Length; i++)
             {
@@ -342,6 +395,12 @@ namespace CSV4Unity
             return span.ToString();
         }
 
+        /// <summary>
+        /// 行末の位置を検索し、位置参照を更新します
+        /// </summary>
+        /// <param name="span">検索対象のスパン</param>
+        /// <param name="pos">現在位置（参照渡し）。行末の次の位置に更新されます</param>
+        /// <returns>行末の位置。見つからない場合は-1</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int IndexOfLineEnd(ReadOnlySpan<char> span, ref int pos)
         {
@@ -365,6 +424,11 @@ namespace CSV4Unity
             return -1;
         }
 
+        /// <summary>
+        /// スパンの末尾から改行文字を除去します
+        /// </summary>
+        /// <param name="span">トリム対象のスパン</param>
+        /// <returns>改行文字を除去したスパン</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ReadOnlySpan<char> TrimLineEnd(ReadOnlySpan<char> span)
         {
@@ -377,11 +441,45 @@ namespace CSV4Unity
         }
 
         /// <summary>
-        /// 1行を解析してフィールド位置のリストを作成します（クォート処理を改善）
+        /// フィールド情報を保持する構造体
+        /// エスケープ処理済みの値を効率的に管理します
         /// </summary>
-        private static void ParseLine(ReadOnlySpan<char> line, List<(int Start, int Length)> positions, char delimiter)
+        private struct FieldInfo
         {
-            positions.Clear();
+            /// <summary>
+            /// フィールドの開始位置
+            /// </summary>
+            public int Start;
+
+            /// <summary>
+            /// フィールドの長さ
+            /// </summary>
+            public int Length;
+
+            /// <summary>
+            /// エスケープ処理済みの文字列（エスケープが不要な場合はnull）
+            /// </summary>
+            public string UnescapedString;
+
+            public FieldInfo(int start, int length, string unescaped = null)
+            {
+                Start = start;
+                Length = length;
+                UnescapedString = unescaped;
+            }
+        }
+
+        /// <summary>
+        /// 1行を解析してフィールド情報のリストを作成します
+        /// RFC 4180準拠: クォートで囲まれたフィールド内の二重クォート（""）を単一クォート（"）にエスケープ処理します
+        /// </summary>
+        /// <param name="line">パース対象の行</param>
+        /// <param name="fields">パース結果を格納するフィールド情報リスト</param>
+        /// <param name="delimiter">フィールド区切り文字</param>
+        /// <exception cref="Exception">クォートが閉じられていない場合</exception>
+        private static void ParseLine(ReadOnlySpan<char> line, List<FieldInfo> fields, char delimiter)
+        {
+            fields.Clear();
 
             if (line.IsEmpty)
             {
@@ -390,6 +488,7 @@ namespace CSV4Unity
 
             int start = 0;
             bool inQuote = false;
+            StringBuilder unescapeBuilder = null;
 
             for (int i = 0; i < line.Length; i++)
             {
@@ -406,42 +505,64 @@ namespace CSV4Unity
                     // クォート内で二重クォート（エスケープ）
                     else if (inQuote && i + 1 < line.Length && line[i + 1] == '"')
                     {
-                        i++; // 次のクォートもスキップ
+                        // 初めてエスケープに遭遇したらStringBuilderを作成
+                        if (unescapeBuilder == null)
+                        {
+                            unescapeBuilder = new StringBuilder();
+                            // これまでの内容を追加
+                            unescapeBuilder.Append(line.Slice(start, i - start));
+                        }
+
+                        // エスケープされた"を1つの"として追加
+                        unescapeBuilder.Append('"');
+                        i++; // 2つ目の"をスキップ
                     }
                     // クォートが閉じる
                     else if (inQuote)
                     {
-                        // フィールド値を追加（クォート内の内容）
-                        positions.Add((start, i - start));
+                        string unescapedString = null;
+
+                        if (unescapeBuilder != null && unescapeBuilder.Length > 0)
+                        {
+                            // 閉じクォートまでの残りを追加
+                            if (i > start)
+                            {
+                                unescapeBuilder.Append(line.Slice(start, i - start));
+                            }
+                            unescapedString = unescapeBuilder.ToString();
+                            unescapeBuilder.Clear();
+                        }
+
+                        fields.Add(new FieldInfo(start, i - start, unescapedString));
                         inQuote = false;
 
-                        // 【修正】クォート閉じ後の処理を簡潔化
-                        // 次の文字がデリミタか行末かチェック
-                        i++; // 閉じクォートの次へ
-
-                        // デリミタまたは行末まで進む
+                        // クォート閉じ後のデリミタまでスキップ
+                        i++;
                         while (i < line.Length && line[i] != delimiter)
                         {
                             i++;
                         }
 
-                        // デリミタが見つかった場合、次のフィールドの開始位置を設定
                         if (i < line.Length && line[i] == delimiter)
                         {
                             start = i + 1;
                         }
                         else
                         {
-                            // 行末に到達
                             start = line.Length;
-                            i--; // forループのi++で調整されるため
+                            i--;
                         }
                     }
                 }
                 else if (c == delimiter && !inQuote)
                 {
-                    positions.Add((start, i - start));
+                    fields.Add(new FieldInfo(start, i - start));
                     start = i + 1;
+                }
+                else if (inQuote && unescapeBuilder != null)
+                {
+                    // エスケープ処理中は1文字ずつ追加
+                    unescapeBuilder.Append(c);
                 }
             }
 
@@ -453,20 +574,45 @@ namespace CSV4Unity
             // 最後のフィールドを追加
             if (start <= line.Length)
             {
-                positions.Add((start, line.Length - start));
+                fields.Add(new FieldInfo(start, line.Length - start));
             }
         }
 
-        private static int FindColumnIndex(ReadOnlySpan<char> key, List<(int Start, int Length)> positions, ReadOnlySpan<char> header)
+        /// <summary>
+        /// フィールド情報リストから指定されたキーに一致する列インデックスを検索します
+        /// </summary>
+        /// <param name="key">検索するキー</param>
+        /// <param name="fields">検索対象のフィールド情報リスト</param>
+        /// <param name="line">元の行データ（Spanを取得するため）</param>
+        /// <returns>一致した列のインデックス</returns>
+        /// <exception cref="Exception">キーが見つからない場合</exception>
+        private static int FindColumnIndex(ReadOnlySpan<char> key, List<FieldInfo> fields, ReadOnlySpan<char> line)
         {
-            for (int i = 0; i < positions.Count; i++)
+            for (int i = 0; i < fields.Count; i++)
             {
-                var span = header.Slice(positions[i].Start, positions[i].Length);
+                var fieldInfo = fields[i];
+
+                // エスケープ済み文字列がある場合はそれを使用、なければSpanから取得
+                ReadOnlySpan<char> span;
+                if (fieldInfo.UnescapedString != null)
+                {
+                    span = fieldInfo.UnescapedString.AsSpan();
+                }
+                else
+                {
+                    span = line.Slice(fieldInfo.Start, fieldInfo.Length);
+                }
+
                 if (Trim(span).SequenceEqual(key)) return i;
             }
             throw new Exception($"Header '{key.ToString()}' not found.");
         }
 
+        /// <summary>
+        /// スパンの前後の空白文字を除去します
+        /// </summary>
+        /// <param name="s">トリム対象のスパン</param>
+        /// <returns>空白文字を除去したスパン</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ReadOnlySpan<char> Trim(ReadOnlySpan<char> s)
         {
@@ -479,11 +625,20 @@ namespace CSV4Unity
 
     /// <summary>
     /// CSVバリデーションエラー専用例外
+    /// バリデーション結果の詳細情報を保持します
     /// </summary>
     public class CsvValidationException : Exception
     {
+        /// <summary>
+        /// バリデーション結果の詳細情報
+        /// </summary>
         public CsvValidationResult ValidationResult { get; }
 
+        /// <summary>
+        /// CSVバリデーション例外を初期化します
+        /// </summary>
+        /// <param name="message">エラーメッセージ</param>
+        /// <param name="validationResult">バリデーション結果</param>
         public CsvValidationException(string message, CsvValidationResult validationResult)
             : base(message)
         {
