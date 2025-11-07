@@ -33,7 +33,7 @@ Unity向けの高性能・型安全なCSVローダーライブラリです。**E
 
 ```
 
-[https://github.com/cotore-game/CSV4Unity.git](https://github.com/cotore-game/CSV4Unity.git)
+https://github.com/cotore-game/CSV4Unity.git
 
 ```
 
