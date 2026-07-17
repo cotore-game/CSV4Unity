@@ -1,0 +1,54 @@
+; =============================================================================
+; Inno Setup Installer Script Template
+; Generated automatically by GitHub Actions. Do not edit directly.
+; =============================================================================
+#pragma encoding "UTF-8"
+
+[Setup]
+AppName={{APP_NAME}}
+AppVersion={{APP_VERSION}}
+AppPublisher={{APP_PUBLISHER}}
+AppPublisherURL={{REPO_URL}}
+AppSupportURL={{REPO_ISSUES_URL}}
+AppUpdatesURL={{REPO_RELEASES_URL}}
+
+DefaultDirName={autopf}\{{APP_ID}}
+DefaultGroupName={{APP_NAME}}
+DisableProgramGroupPage=yes
+
+OutputDir=installer
+OutputBaseFilename={{APP_EXE_NAME}}-Setup-v{{APP_VERSION}}
+
+Compression=lzma2
+SolidCompression=yes
+
+ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64
+
+UninstallDisplayName={{APP_NAME}}
+UninstallDisplayIcon={app}\{{APP_EXE_NAME}}.exe
+
+WizardStyle=modern
+ShowLanguageDialog=auto
+
+[Languages]
+Name: "english";  MessagesFile: "compiler:Default.isl"
+Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+[Files]
+Source: "build\StandaloneWindows64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+
+[Icons]
+Name: "{group}\{{APP_NAME}}"; Filename: "{app}\{{APP_EXE_NAME}}.exe"
+Name: "{group}\{cm:UninstallProgram,{{APP_NAME}}}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\{{APP_NAME}}"; Filename: "{app}\{{APP_EXE_NAME}}.exe"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\{{APP_EXE_NAME}}.exe"; Description: "{cm:LaunchProgram,{{APP_NAME}}}"; Flags: nowait postinstall skipifsilent
+
+[CustomMessages]
+english.LaunchProgram=Launch %1
+japanese.LaunchProgram=%1 を起動する

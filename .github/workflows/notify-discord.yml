@@ -1,0 +1,189 @@
+name: Discord Notification
+
+on:
+  workflow_call:
+    inputs:
+      status:
+        description: 'Build status (success / failure / cancelled)'
+        required: true
+        type: string
+      version:
+        description: 'Build version'
+        required: true
+        type: string
+      workflow-name:
+        description: 'Workflow name'
+        required: true
+        type: string
+      job-name:
+        description: 'Job name that triggered notification'
+        required: false
+        type: string
+        default: 'Build'
+      caller-run-id:
+        description: 'Run ID of the caller workflow (for artifact/run links)'
+        required: false
+        type: string
+        default: ''
+      installer-artifact-name:
+        description: 'Installer Artifact Name (Optional)'
+        required: false
+        type: string
+        default: ''
+      windows-artifact-name:
+        description: 'Windows Build Artifact Name (Optional)'
+        required: false
+        type: string
+        default: ''
+      webgl-artifact-name:
+        description: 'WebGL Build Artifact Name (Optional)'
+        required: false
+        type: string
+        default: ''
+      pages-url:
+        description: 'Deployed GitHub Pages URL (Optional)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      DISCORD_WEBHOOK_URL:
+        required: false
+
+jobs:
+  notify:
+    name: Send Discord Notification
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    env:
+      WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+    steps:
+      - name: Check Webhook Availability
+        id: check
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "DISCORD_WEBHOOK_URL is not set. Skipping notification."
+          fi
+
+      - name: Resolve Artifact URLs
+        id: artifacts
+        if: steps.check.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # caller-run-id が渡されていればそちらを優先する
+          # （workflow_call 内では github.run_id が呼び出し先自身の run になるため）
+          RUN_ID="${{ inputs.caller-run-id }}"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID="${{ github.run_id }}"
+          fi
+
+          API_URL="https://api.github.com/repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts?per_page=100"
+          ARTIFACT_JSON=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$API_URL" || echo '{"artifacts": []}')
+          get_id() {
+            local name="$1"
+            echo "$ARTIFACT_JSON" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for a in data.get('artifacts', []):
+              if a['name'] == '$name':
+                  print(a['id'])
+                  break
+          "
+          }
+
+          BASE="https://github.com/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts"
+
+          for VAR in installer windows webgl; do
+            case $VAR in
+              installer) NAME="${{ inputs.installer-artifact-name }}" ;;
+              windows)   NAME="${{ inputs.windows-artifact-name }}" ;;
+              webgl)     NAME="${{ inputs.webgl-artifact-name }}" ;;
+            esac
+
+            if [ -n "$NAME" ]; then
+              ID=$(get_id "$NAME")
+              if [ -n "$ID" ]; then
+                echo "${VAR}_url=${BASE}/${ID}" >> $GITHUB_OUTPUT
+              else
+                echo "${VAR}_url=" >> $GITHUB_OUTPUT
+                echo "artifact not found: $NAME"
+              fi
+            else
+              echo "${VAR}_url=" >> $GITHUB_OUTPUT
+            fi
+          done
+
+      - name: Prepare Notification Data
+        id: prepare
+        if: steps.check.outputs.available == 'true'
+        run: |
+          case "${{ inputs.status }}" in
+            success)
+              echo "color=3066993" >> $GITHUB_OUTPUT
+              echo "label=✅ ビルド成功" >> $GITHUB_OUTPUT
+              ;;
+            failure)
+              echo "color=15158332" >> $GITHUB_OUTPUT
+              echo "label=❌ ビルド失敗" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "color=15844367" >> $GITHUB_OUTPUT
+              echo "label=⚠️ キャンセル" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+          RUN_ID="${{ inputs.caller-run-id }}"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID="${{ github.run_id }}"
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${RUN_ID}"
+          echo "run_url=${RUN_URL}" >> $GITHUB_OUTPUT
+
+          {
+            echo "body<<EOF"
+            echo "**${{ inputs.workflow-name }}** ${{ inputs.job-name }}"
+            echo ""
+            echo "version: \`${{ inputs.version }}\`"
+            echo "ref: \`${{ github.ref_name }}\`"
+            echo "actor: ${{ github.actor }}"
+            echo ""
+
+            INSTALLER_URL="${{ steps.artifacts.outputs.installer_url }}"
+            WINDOWS_URL="${{ steps.artifacts.outputs.windows_url }}"
+            WEBGL_URL="${{ steps.artifacts.outputs.webgl_url }}"
+            PAGES_URL="${{ inputs.pages-url }}"
+
+            if [ -n "$INSTALLER_URL" ]; then
+              echo "[Installer (exe)](${INSTALLER_URL})"
+            fi
+            if [ -n "$WINDOWS_URL" ]; then
+              echo "[Windows Build](${WINDOWS_URL})"
+            fi
+            if [ -n "$WEBGL_URL" ]; then
+              echo "[WebGL Build](${WEBGL_URL})"
+            fi
+            if [ -n "$PAGES_URL" ]; then
+              echo "[Play on GitHub Pages](${PAGES_URL})"
+            fi
+
+            echo ""
+            echo "[Show Workflow Run](${RUN_URL})"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Send Discord Notification
+        if: steps.check.outputs.available == 'true'
+        uses: tsickert/discord-webhook@v6.0.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          username: "GitHub Actions"
+          avatar-url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+          embed-title: "${{ inputs.workflow-name }} - ${{ steps.prepare.outputs.label }}"
+          embed-color: ${{ steps.prepare.outputs.color }}
+          embed-url: "${{ steps.prepare.outputs.run_url }}"
+          embed-description: ${{ steps.prepare.outputs.body }}

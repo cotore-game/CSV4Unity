@@ -1,0 +1,22 @@
+# ============================================================
+# プロジェクト設定
+# ============================================================
+
+# アプリ表示名
+app_name: "My Game"
+
+# 実行ファイル名（.exe なし・スペース不可）
+# Unity の Build Name と一致させること
+app_exe_name: "MyGame"
+
+# インストール先フォルダ名 / レジストリキー（英数字推奨）
+app_id: "MyGame"
+
+# パブリッシャー名
+app_publisher: "your-org"
+
+# リリースノートに表示するシステム要件
+system_requirements: "Windows 10 / 11 (64-bit)"
+
+# Discord / ワークフロー通知の表示名
+workflow_display_name: "My Game"
