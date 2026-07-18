@@ -1,0 +1,72 @@
+name: Docs
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "Assets/Plugins/CSVLoader/Runtime/**/*.cs"
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Assets/Plugins/CSVLoader/Runtime/**/*.cs"
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build API site
+    runs-on: ubuntu-latest
+    container:
+      image: unityci/editor:ubuntu-6000.0.73f1-base-3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install DocFX
+        run: dotnet tool install --global docfx --version 2.78.5
+
+      - name: Build documentation
+        env:
+          UnityEditorContents: /opt/unity/Editor/Data
+        run: |
+          dotnet restore docs/CSV4Unity.Docs.csproj
+          cd docs
+          docfx metadata docfx.json
+          docfx build docfx.json
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/_site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
