@@ -9,6 +9,12 @@ CSVをクラスへ一括変換せず、セルを必要なときに指定した�
 > [!IMPORTANT]
 > 現在は1.0未満の再設計中です。APIは今後も変更される可能性があります。利用時はGitのタグまたはコミットを固定してください。
 
+## ドキュメント
+
+- [APIリファレンス](https://cotore-game.github.io/CSV4Unity/)
+- [コア設計（日本語）](./docs/ja/architecture.md)
+- [Core architecture (English)](./docs/en/architecture.md)
+
 ## 主な機能
 
 - RFC 4180形式のクォート、カンマ、二重引用符、クォート内改行を解析

@@ -1,0 +1,32 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "files": ["CSV4Unity.Docs.csproj"],
+          "src": "."
+        }
+      ],
+      "dest": "api",
+      "outputFormat": "mref",
+      "namespaceLayout": "nested",
+      "memberLayout": "separatePages",
+      "filter": "filterConfig.yml"
+    }
+  ],
+  "build": {
+    "content": [
+      { "files": ["api/**.yml", "api/index.md"] },
+      { "files": ["index.md", "toc.yml", "ja/**.md", "en/**.md"] }
+    ],
+    "output": "_site",
+    "template": ["default", "modern"],
+    "globalMetadata": {
+      "_appName": "CSV4Unity",
+      "_appTitle": "CSV4Unity API Reference",
+      "_appFooter": "CSV4Unity - RFC 4180 CSV reader for Unity. MIT License.",
+      "_enableSearch": true,
+      "_disableContribution": false
+    }
+  }
+}

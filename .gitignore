@@ -44,6 +44,7 @@
 ExportedObj/
 .consulo/
 *.csproj
+!/docs/CSV4Unity.Docs.csproj
 *.unityproj
 *.sln
 *.slnx
@@ -115,6 +116,12 @@ CaseSensitiveTest
 /[Aa]rtifacts/
 *.coverage
 *.coveragexml
+
+# DocFX generated files
+/docs/api/
+/docs/_site/
+/docs/bin/
+/docs/obj/
 
 # OS generated files
 .DS_Store

@@ -1,0 +1,8 @@
+- name: Home
+  href: index.md
+- name: APIリファレンス
+  href: api/
+- name: コア設計（日本語）
+  href: ja/architecture.md
+- name: Core architecture (English)
+  href: en/architecture.md
