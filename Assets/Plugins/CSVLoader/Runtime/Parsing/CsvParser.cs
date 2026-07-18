@@ -11,6 +11,17 @@ namespace CSV4Unity
         /// <summary>
         /// CSV文字列を解析します。セル値の型推測やValidationは行いません。
         /// </summary>
+        /// <param name="source">解析するCSV文字列。先頭のUTF-8 BOM文字は読み飛ばします。</param>
+        /// <param name="options">解析方法。<see langword="null"/>の場合は既定値を使用します。</param>
+        /// <param name="name">生成するドキュメントの識別名。<see langword="null"/>の場合は空文字列を使用します。</param>
+        /// <returns>元文字列とセル位置を保持する読み取り専用ドキュメント。</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="source"/>が<see langword="null"/>です。</exception>
+        /// <exception cref="ArgumentException">区切り文字にダブルクォートまたは改行文字が指定されています。</exception>
+        /// <exception cref="CsvParseException">クォート構文、レコード終端、列数、またはヘッダーが不正です。</exception>
+        /// <remarks>
+        /// CRLF、CR、LFをレコード終端として認識し、クォートされたフィールド内の改行はセル値として保持します。
+        /// ヘッダー名は大文字小文字を区別し、重複を許可しません。
+        /// </remarks>
         public static CsvDocument Parse(string source, CsvParseOptions options = null, string name = null)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));

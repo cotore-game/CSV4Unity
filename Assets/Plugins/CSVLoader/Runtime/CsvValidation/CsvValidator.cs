@@ -7,11 +7,26 @@ namespace CSV4Unity.Validation
     /// <summary>
     /// Enumに定義された制約属性を使ってCSVテーブルを検証します。
     /// </summary>
+    /// <remarks>Validationは入力テーブルを変更せず、検出内容を新しい<see cref="CsvValidationResult"/>へ格納します。</remarks>
     public static class CsvValidator
     {
         /// <summary>
         /// Enumの制約属性に従ってテーブルを検証します。読み込んだデータ自体は変更しません。
         /// </summary>
+        /// <typeparam name="TField">列と制約属性を定義したEnum型。</typeparam>
+        /// <param name="table">検証するEnum対応テーブル。</param>
+        /// <param name="validationSchema">
+        /// 使用するValidationスキーマ。<see langword="null"/>の場合は<see cref="CsvValidationSchema{TField}.Default"/>を使用します。
+        /// </param>
+        /// <param name="context">ForeignKeyの参照先テーブル。参照先が同じテーブルだけの場合は<see langword="null"/>にできます。</param>
+        /// <param name="formatProvider">型変換と数値範囲検証に使用する形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
+        /// <returns>すべてのエラーとWarningを格納したValidation結果。</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="table"/>が<see langword="null"/>です。</exception>
+        /// <remarks>
+        /// PrimaryKeyは空でなく一意、Uniqueは空セルを除いて一意であることを大文字小文字を区別して検証します。
+        /// ForeignKeyの参照テーブルまたは列を解決できない場合、その制約を実行せずWarningを追加します。
+        /// 空セルはPrimaryKeyとNotNullを除くセル単位制約の対象外です。
+        /// </remarks>
         public static CsvValidationResult Validate<TField>(
             CsvTable<TField> table,
             CsvValidationSchema<TField> validationSchema = null,

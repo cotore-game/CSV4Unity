@@ -17,25 +17,44 @@ namespace CSV4Unity
             _range = range;
         }
 
+        /// <summary>セルの内容が空かを取得します。</summary>
+        /// <value>空フィールドまたは空のクォートフィールドの場合は<see langword="true"/>。</value>
         public bool IsEmpty => _range.Length == 0;
+
+        /// <summary>入力CSVでセルがダブルクォートに囲まれていたかを取得します。</summary>
         public bool IsQuoted => (_range.Flags & CsvCellFlags.Quoted) != 0;
+
+        /// <summary>セル内に二重化されたダブルクォートが含まれているかを取得します。</summary>
         public bool HasEscapedQuotes => (_range.Flags & CsvCellFlags.EscapedQuotes) != 0;
+
+        /// <summary>元CSV文字列内のセル内容を割り当てなしで参照します。</summary>
+        /// <value>外側のダブルクォートを除き、二重化されたダブルクォートを解除していない文字列範囲。</value>
         public ReadOnlySpan<char> RawSpan => _source.AsSpan(_range.Start, _range.Length);
 
-        /// <summary>CSVのエスケープを解除した文字列を返します。</summary>
+        /// <summary>CSVのダブルクォートエスケープを解除した文字列を返します。</summary>
+        /// <returns>セルのデコード済み文字列。</returns>
+        /// <remarks>戻り値として新しい文字列を生成します。</remarks>
         public string GetString()
         {
             return Decode(_source, _range);
         }
 
-        /// <summary>セルを指定型へ変換し、失敗時はCsvConversionExceptionを送出します。</summary>
+        /// <summary>セルを指定型へ変換します。</summary>
+        /// <typeparam name="T">変換先型。</typeparam>
+        /// <param name="formatProvider">数値および日時形式。<see langword="null"/>の場合はInvariantCultureを使用します。</param>
+        /// <returns>変換された値。</returns>
+        /// <exception cref="CsvConversionException"><typeparamref name="T"/>へ変換できません。</exception>
         public T Get<T>(IFormatProvider formatProvider = null)
         {
             if (TryGet(out T value, formatProvider)) return value;
             throw new CsvConversionException(GetString(), typeof(T));
         }
 
-        /// <summary>セルを指定型へ変換できる場合に値を返します。</summary>
+        /// <summary>セルを指定型へ変換します。</summary>
+        /// <typeparam name="T">変換先型。</typeparam>
+        /// <param name="value">変換に成功した場合の値。失敗した場合は<see langword="default"/>。</param>
+        /// <param name="formatProvider">数値および日時形式。<see langword="null"/>の場合はInvariantCultureを使用します。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
         public bool TryGet<T>(out T value, IFormatProvider formatProvider = null)
         {
             if (typeof(T) == typeof(string))
@@ -54,6 +73,10 @@ namespace CSV4Unity
         }
 
         /// <summary>例外を送出せず、指定型へ変換可能かを確認します。</summary>
+        /// <param name="targetType">変換先型。</param>
+        /// <param name="formatProvider">数値および日時形式。<see langword="null"/>の場合はInvariantCultureを使用します。</param>
+        /// <returns>変換可能な場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="targetType"/>が<see langword="null"/>です。</exception>
         public bool CanGet(Type targetType, IFormatProvider formatProvider = null)
         {
             if (!HasEscapedQuotes)
@@ -65,6 +88,10 @@ namespace CSV4Unity
             return CsvValueConverter.CanConvert(decoded.AsSpan(), targetType, formatProvider);
         }
 
+        /// <summary>セルを32ビット符号付き整数へ変換します。</summary>
+        /// <param name="value">変換に成功した場合の値。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks>InvariantCultureを使用します。</remarks>
         public bool TryGetInt32(out int value)
         {
             if (!HasEscapedQuotes)
@@ -76,12 +103,19 @@ namespace CSV4Unity
             return false;
         }
 
+        /// <summary>セルを32ビット符号付き整数として取得します。</summary>
+        /// <returns>変換された値。</returns>
+        /// <exception cref="CsvConversionException">32ビット符号付き整数へ変換できません。</exception>
         public int GetInt32()
         {
             if (TryGetInt32(out int value)) return value;
             throw new CsvConversionException(GetString(), typeof(int));
         }
 
+        /// <summary>セルを64ビット符号付き整数へ変換します。</summary>
+        /// <param name="value">変換に成功した場合の値。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks>InvariantCultureを使用します。</remarks>
         public bool TryGetInt64(out long value)
         {
             if (!HasEscapedQuotes)
@@ -93,12 +127,19 @@ namespace CSV4Unity
             return false;
         }
 
+        /// <summary>セルを64ビット符号付き整数として取得します。</summary>
+        /// <returns>変換された値。</returns>
+        /// <exception cref="CsvConversionException">64ビット符号付き整数へ変換できません。</exception>
         public long GetInt64()
         {
             if (TryGetInt64(out long value)) return value;
             throw new CsvConversionException(GetString(), typeof(long));
         }
 
+        /// <summary>セルを単精度浮動小数点数へ変換します。</summary>
+        /// <param name="value">変換に成功した場合の値。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks>InvariantCultureを使用します。</remarks>
         public bool TryGetSingle(out float value)
         {
             if (!HasEscapedQuotes)
@@ -110,12 +151,19 @@ namespace CSV4Unity
             return false;
         }
 
+        /// <summary>セルを単精度浮動小数点数として取得します。</summary>
+        /// <returns>変換された値。</returns>
+        /// <exception cref="CsvConversionException">単精度浮動小数点数へ変換できません。</exception>
         public float GetSingle()
         {
             if (TryGetSingle(out float value)) return value;
             throw new CsvConversionException(GetString(), typeof(float));
         }
 
+        /// <summary>セルを倍精度浮動小数点数へ変換します。</summary>
+        /// <param name="value">変換に成功した場合の値。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks>InvariantCultureを使用します。</remarks>
         public bool TryGetDouble(out double value)
         {
             if (!HasEscapedQuotes)
@@ -127,12 +175,18 @@ namespace CSV4Unity
             return false;
         }
 
+        /// <summary>セルを倍精度浮動小数点数として取得します。</summary>
+        /// <returns>変換された値。</returns>
+        /// <exception cref="CsvConversionException">倍精度浮動小数点数へ変換できません。</exception>
         public double GetDouble()
         {
             if (TryGetDouble(out double value)) return value;
             throw new CsvConversionException(GetString(), typeof(double));
         }
 
+        /// <summary>セルをBoolean値へ変換します。</summary>
+        /// <param name="value">変換に成功した場合の値。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
         public bool TryGetBoolean(out bool value)
         {
             if (!HasEscapedQuotes)
@@ -144,12 +198,17 @@ namespace CSV4Unity
             return false;
         }
 
+        /// <summary>セルをBoolean値として取得します。</summary>
+        /// <returns>変換された値。</returns>
+        /// <exception cref="CsvConversionException">Boolean値へ変換できません。</exception>
         public bool GetBoolean()
         {
             if (TryGetBoolean(out bool value)) return value;
             throw new CsvConversionException(GetString(), typeof(bool));
         }
 
+        /// <summary>CSVのエスケープを解除したセル文字列を返します。</summary>
+        /// <returns><see cref="GetString"/>と同じ文字列。</returns>
         public override string ToString()
         {
             return GetString();

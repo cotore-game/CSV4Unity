@@ -9,6 +9,8 @@ namespace CSV4Unity.Validation
     /// <summary>
     /// Enumフィールドの制約属性を、再利用可能な検証規則へ変換します。
     /// </summary>
+    /// <typeparam name="TField">制約属性を定義したEnum型。</typeparam>
+    /// <remarks>生成後の規則は変更されず、複数の<see cref="CsvTable{TField}"/>のValidationに再利用できます。</remarks>
     public sealed class CsvValidationSchema<TField> where TField : struct, Enum
     {
         private readonly CsvFieldValidationRule<TField>[] _rules;
@@ -18,10 +20,19 @@ namespace CSV4Unity.Validation
             _rules = rules;
         }
 
+        /// <summary>Enum型ごとに一度生成される既定スキーマを取得します。</summary>
         public static CsvValidationSchema<TField> Default { get; } = Create();
+
+        /// <summary>1つ以上の制約属性を持つEnumフィールド数を取得します。</summary>
         public int RuleCount => _rules.Length;
 
         /// <summary>Enumに定義された制約属性からスキーマを作成します。</summary>
+        /// <returns>属性をコンパイルした新しいValidationスキーマ。</returns>
+        /// <exception cref="ArgumentException">定義された正規表現パターンが不正です。</exception>
+        /// <remarks>
+        /// Reflectionによる属性読み取りと正規表現の生成を行います。繰り返し検証する場合は<see cref="Default"/>を再利用してください。
+        /// 制約属性を持たないEnumフィールドは規則に含まれません。
+        /// </remarks>
         public static CsvValidationSchema<TField> Create()
         {
             FieldInfo[] fields = typeof(TField).GetFields(BindingFlags.Public | BindingFlags.Static);
