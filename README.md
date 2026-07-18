@@ -31,7 +31,7 @@ CSVをクラスへ一括変換せず、セルを必要なときに指定した�
 Unity Package Managerの `Add package from git URL...` に次のURLを指定します。
 
 ```text
-https://github.com/cotore-game/CSV4Unity.git?path=Assets/Plugins/CSVLoader
+https://github.com/cotore-game/CSV4Unity.git?path=/Assets/Plugins/CSVLoader#v0.2.0
 ```
 
 安定した利用には、リリースタグまたはコミットを固定したURLを使用してください。
