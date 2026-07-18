@@ -7,6 +7,12 @@ CSV4Unity reads CSV text into row, column, and cell views for Unity. Values rema
 > [!IMPORTANT]
 > The library is currently being redesigned before 1.0. Pin a release tag or commit when using the Git package URL.
 
+## Documentation
+
+- [API reference](https://cotore-game.github.io/CSV4Unity/)
+- [Core architecture (Japanese)](./docs/ja/architecture.md)
+- [Core architecture (English)](./docs/en/architecture.md)
+
 ## Features
 
 - RFC 4180 quoted fields, escaped quotes, commas, and embedded line breaks

@@ -1,0 +1,15 @@
+# CSV4Unity自身の公開APIだけをリファレンスへ掲載します。
+apiRules:
+  - exclude:
+      uidRegex: ^System\.
+  - exclude:
+      uidRegex: ^Unity\.
+  - exclude:
+      uidRegex: ^UnityEngine\.
+  - exclude:
+      uidRegex: ^UnityEditor\.
+  - exclude:
+      hasAttribute:
+        uid: System.ComponentModel.EditorBrowsableAttribute
+        ctorArguments:
+          - System.ComponentModel.EditorBrowsableState.Never

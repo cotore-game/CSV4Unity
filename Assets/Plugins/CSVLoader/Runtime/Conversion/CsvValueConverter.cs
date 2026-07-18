@@ -8,11 +8,22 @@ namespace CSV4Unity
     /// </summary>
     public static class CsvValueConverter
     {
+        /// <summary>文字列をBoolean値へ変換します。</summary>
+        /// <param name="value">変換する文字列。</param>
+        /// <param name="result">変換に成功した場合の値。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks><see cref="bool.TryParse(string, out bool)"/>と同じ文字列表現を受け付けます。</remarks>
         public static bool TryConvertBoolean(ReadOnlySpan<char> value, out bool result)
         {
             return bool.TryParse(value, out result);
         }
 
+        /// <summary>文字列を32ビット符号付き整数へ変換します。</summary>
+        /// <param name="value">変換する文字列。</param>
+        /// <param name="result">変換に成功した場合の値。</param>
+        /// <param name="formatProvider">数値形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks><see cref="NumberStyles.Integer"/>として解析します。</remarks>
         public static bool TryConvertInt32(
             ReadOnlySpan<char> value,
             out int result,
@@ -21,6 +32,12 @@ namespace CSV4Unity
             return int.TryParse(value, NumberStyles.Integer, formatProvider ?? CultureInfo.InvariantCulture, out result);
         }
 
+        /// <summary>文字列を64ビット符号付き整数へ変換します。</summary>
+        /// <param name="value">変換する文字列。</param>
+        /// <param name="result">変換に成功した場合の値。</param>
+        /// <param name="formatProvider">数値形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks><see cref="NumberStyles.Integer"/>として解析します。</remarks>
         public static bool TryConvertInt64(
             ReadOnlySpan<char> value,
             out long result,
@@ -29,6 +46,12 @@ namespace CSV4Unity
             return long.TryParse(value, NumberStyles.Integer, formatProvider ?? CultureInfo.InvariantCulture, out result);
         }
 
+        /// <summary>文字列を単精度浮動小数点数へ変換します。</summary>
+        /// <param name="value">変換する文字列。</param>
+        /// <param name="result">変換に成功した場合の値。</param>
+        /// <param name="formatProvider">数値形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks><see cref="NumberStyles.Float"/>として解析します。</remarks>
         public static bool TryConvertSingle(
             ReadOnlySpan<char> value,
             out float result,
@@ -37,6 +60,12 @@ namespace CSV4Unity
             return float.TryParse(value, NumberStyles.Float, formatProvider ?? CultureInfo.InvariantCulture, out result);
         }
 
+        /// <summary>文字列を倍精度浮動小数点数へ変換します。</summary>
+        /// <param name="value">変換する文字列。</param>
+        /// <param name="result">変換に成功した場合の値。</param>
+        /// <param name="formatProvider">数値形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks><see cref="NumberStyles.Float"/>として解析します。</remarks>
         public static bool TryConvertDouble(
             ReadOnlySpan<char> value,
             out double result,
@@ -45,12 +74,29 @@ namespace CSV4Unity
             return double.TryParse(value, NumberStyles.Float, formatProvider ?? CultureInfo.InvariantCulture, out result);
         }
 
+        /// <summary>文字列を指定型へ変換します。</summary>
+        /// <typeparam name="T">変換先型。</typeparam>
+        /// <param name="value">変換する文字列。</param>
+        /// <param name="formatProvider">数値および日時形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
+        /// <returns>変換された値。</returns>
+        /// <exception cref="CsvConversionException"><typeparamref name="T"/>へ変換できません。</exception>
+        /// <remarks>
+        /// string、bool、short、int、uint、long、ulong、float、double、decimal、
+        /// <see cref="DateTime"/>、<see cref="Guid"/>、Enum、およびこれらのNullable型をサポートします。
+        /// Enum名は大文字小文字を区別します。空文字列はNullable型の<see langword="null"/>へ変換されます。
+        /// </remarks>
         public static T Convert<T>(ReadOnlySpan<char> value, IFormatProvider formatProvider = null)
         {
             if (TryConvert(value, out T result, formatProvider)) return result;
             throw new CsvConversionException(value.ToString(), typeof(T));
         }
 
+        /// <summary>文字列を指定型へ変換できるか確認します。</summary>
+        /// <param name="value">確認する文字列。</param>
+        /// <param name="targetType">変換先型。</param>
+        /// <param name="formatProvider">数値および日時形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
+        /// <returns>変換可能な場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="targetType"/>が<see langword="null"/>です。</exception>
         public static bool CanConvert(
             ReadOnlySpan<char> value,
             Type targetType,
@@ -73,6 +119,16 @@ namespace CSV4Unity
                 out _);
         }
 
+        /// <summary>文字列を指定型へ変換します。</summary>
+        /// <typeparam name="T">変換先型。</typeparam>
+        /// <param name="value">変換する文字列。</param>
+        /// <param name="result">変換に成功した場合の値。失敗した場合は<see langword="default"/>。</param>
+        /// <param name="formatProvider">数値および日時形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
+        /// <returns>変換に成功した場合は<see langword="true"/>、それ以外は<see langword="false"/>。</returns>
+        /// <remarks>
+        /// 対応型とEnumの比較規則は<see cref="Convert{T}(ReadOnlySpan{char}, IFormatProvider)"/>と同じです。
+        /// 変換先型ごとの変換処理はジェネリックキャッシュへ保存されます。
+        /// </remarks>
         public static bool TryConvert<T>(
             ReadOnlySpan<char> value,
             out T result,

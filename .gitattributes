@@ -28,6 +28,7 @@
 *.uxml text eol=lf
 *.uss text eol=lf
 *.sh text eol=lf
+*.ps1 text eol=lf
 
 # Exclude TextMesh Pro files from language statistics
 "Assets/TextMesh Pro/**" linguist-generated=true linguist-vendored=true

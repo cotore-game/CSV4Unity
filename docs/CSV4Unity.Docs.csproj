@@ -1,0 +1,29 @@
+<!--
+  DocFXが公開APIを解析するためだけのプロジェクトです。
+  UnityのコンパイルやUPMパッケージには含まれません。
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <WarningsAsErrors>$(WarningsAsErrors);CS0419;CS1570;CS1572;CS1573;CS1584;CS1587;CS1591;CS1658</WarningsAsErrors>
+
+    <UnityEditorContents Condition="'$(UnityEditorContents)' == ''">/opt/unity/Editor/Data</UnityEditorContents>
+    <UnityManaged Condition="Exists('$(UnityEditorContents)/Resources/Scripting/Managed')">$(UnityEditorContents)/Resources/Scripting/Managed</UnityManaged>
+    <UnityManaged Condition="'$(UnityManaged)' == '' and Exists('$(UnityEditorContents)/Managed')">$(UnityEditorContents)/Managed</UnityManaged>
+    <RuntimeSource>$(MSBuildThisFileDirectory)../Assets/Plugins/CSVLoader/Runtime</RuntimeSource>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(RuntimeSource)/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="$(UnityManaged)/UnityEngine/*.dll" Private="false" />
+  </ItemGroup>
+
+</Project>
