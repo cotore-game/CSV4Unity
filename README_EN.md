@@ -29,7 +29,7 @@ CSV4Unity reads CSV text into row, column, and cell views for Unity. Values rema
 Add this URL through Unity Package Manager:
 
 ```text
-https://github.com/cotore-game/CSV4Unity.git?path=Assets/Plugins/CSVLoader
+https://github.com/cotore-game/CSV4Unity.git?path=/Assets/Plugins/CSVLoader#v0.2.0
 ```
 
 ## Basic usage
