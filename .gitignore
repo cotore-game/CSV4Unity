@@ -34,6 +34,9 @@
 # Visual Studio cache directory
 .vs/
 
+# JetBrains IDE
+.idea/
+
 # Gradle cache directory
 .gradle/
 
@@ -105,3 +108,15 @@ CaseSensitiveTest
 # Editor generated files
 .vsconfig
 .vscode
+
+# Test and coverage outputs
+/[Tt]est[Rr]esults/
+/[Cc]ode[Cc]overage/
+/[Aa]rtifacts/
+*.coverage
+*.coveragexml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini

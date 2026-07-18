@@ -1,0 +1,4 @@
+Id,Text,Note
+1,"first line
+second line","comma, inside"
+2,"escaped ""quote""",tail

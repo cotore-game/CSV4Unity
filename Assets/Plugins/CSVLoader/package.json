@@ -1,0 +1,20 @@
+{
+  "name": "com.cotore.csv4unity",
+  "displayName": "CSV4Unity",
+  "author": { 
+    "name": "cotore", 
+    "url": "https://github.com/cotore-game" 
+  },
+  "version": "0.1.2",
+  "unity": "6000.0",
+  "description": "An RFC 4180 CSV reader for Unity with enum column access and attribute validation.",
+  "keywords": [ 
+    "csv", 
+    "data", 
+    "validation", 
+    "utility" 
+  ],
+  "license": "MIT",
+  "category": "Utility",
+  "dependencies": {}
+}

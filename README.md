@@ -1,138 +1,191 @@
-# Unity_TemplateRepo
-Unity6 テンプレートリポジトリ
-Windows ビルド・インストーラー作成・WebGL デプロイ・Discord 通知を自動化する Actions つきです。
+> English overview: [README_EN.md](./README_EN.md)
 
-## ディレクトリ構成
+# CSV4Unity
 
-```
-.github/
-├── project.yml                    # プロジェクト設定（ここだけ編集してください）
-├── index/
-│   ├── meta.yml                   # WebGL PagesのOGP設定
-│   └── icon.png                   # OGP・favicon用画像
-├── inno/
-│   └── installer.iss.template     # Inno Setupスクリプトテンプレート
-├── scripts/
-│   ├── cleanup-build.ps1          # ビルド成果物の不要フォルダ削除
-│   ├── generate-iss.ps1           # .issファイル生成
-│   └── inject-ogp.py              # index.htmlへのOGP タグ注入
-└── workflows/
-    ├── release.yml                # メインワークフロー
-    ├── build-unity.yml            # Unityビルド（再利用）
-    ├── create-installer.yml       # Inno Setupインストーラー作成（再利用）
-    ├── deploy-webgl.yml           # GitHub Pagesデプロイ（再利用）
-    └── notify-discord.yml         # Discord 通知（再利用）
-```
+CSV4Unityは、Unityの `TextAsset` またはCSV文字列を読み取り、行・列・セルのどの方向からでも参照できるCSVライブラリです。
 
----
+CSVをクラスへ一括変換せず、セルを必要なときに指定した型へ変換します。そのため、ADVシナリオの `Arg1` のように、行ごとに文字列・整数・真偽値などが混在する列も扱えます。
 
-## セットアップ
+> [!IMPORTANT]
+> 現在は1.0未満の再設計中です。APIは今後も変更される可能性があります。利用時はGitのタグまたはコミットを固定してください。
 
-### 1. プロジェクト設定
+## 主な機能
 
-`.github/project.yml` を編集します。**このファイルだけ触れば基本的な設定は完了します。**
+- RFC 4180形式のクォート、カンマ、二重引用符、クォート内改行を解析
+- Enumによる列指定
+- ヘッダー名・列番号による非ジェネリックアクセス
+- 行アクセスと列アクセス
+- 必要なセルだけを明示的に型変換
+- 検索用インデックスの明示生成
+- Enum属性によるValidation
+- CSV Inspectorからの手動Validation
 
-```yaml
-# 表示名（スタートメニュー・通知）日本語可
-app_name: "My Game"
-# 実行ファイル名（.exe なし・ASCII文字のみ）
-app_exe_name: "MyGame"
-# インストール先フォルダ名・レジストリキー（ASCII文字のみ）
-app_id: "MyGame"
-# パブリッシャー名
-app_publisher: "your-org"
-# 要件
-system_requirements: "Windows 10 / 11 (64-bit)"
-# Discord 通知の見出し
-workflow_display_name: "My Game"
+## インストール
+
+Unity Package Managerの `Add package from git URL...` に次のURLを指定します。
+
+```text
+https://github.com/cotore-game/CSV4Unity.git?path=Assets/Plugins/CSVLoader
 ```
 
-> `app_name` には日本語を使えます。インストーラーのスタートメニュー・ショートカット表示名に使われます（例：原神 → `原神`、実行ファイルは `Genshin.exe`）。
-> `app_exe_name` は ASCII のみにしてください。
+安定した利用には、リリースタグまたはコミットを固定したURLを使用してください。
 
-### 2. GitHub Secrets の設定
+## Enumで列を指定する
 
-リポジトリの Settings → Secrets and variables → Actions に以下を追加します。
+CSVヘッダーと同じ名前のEnumを定義します。
 
-| Secret 名 | 必須 | 内容 |
-|---|---|---|
-| `UNITY_EMAIL` | ◯ | Unity アカウントのメールアドレス |
-| `UNITY_PASSWORD` | ◯ | Unity アカウントのパスワード |
-| `UNITY_LICENSE` | ◯ | Unity ライセンスファイルの内容（`.ulf` の中身） |
-| `DISCORD_WEBHOOK_URL` | － | Discord の Webhook URL（未設定なら通知をスキップ） |
-
-### 3. GitHub Pages の有効化（WebGL デプロイを使う場合）
-
-リポジトリの Settings → Pages → Source を **GitHub Actions** に設定します。
-
-### 4. OGP 設定（WebGL デプロイを使う場合）
-
-`.github/index/meta.yml` を編集します。
-
-```yaml
-enabled: true
-title: "ゲームタイトル"
-description: "ゲームの説明文"
-icon: true
-icon_file: "icon.png" # .github/index/ に画像を置く
-# theme_color: "#1a1a2e" # ブラウザのテーマカラー（任意）
+```csharp
+public enum ScenarioField
+{
+    Command,
+    Arg1,
+    Arg2,
+    Text
+}
 ```
 
-`meta.yml` が存在しない、または `enabled: false` の場合は OGP 注入をスキップします。
-
----
-
-## 使い方
-
-### タグをプッシュして自動リリース
-
-`v` から始まるタグをプッシュすると、Windows・WebGL 両方をビルドして GitHub Release を作成し、GitHub Pages にデプロイします。
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
+```csv
+Command,Arg1,Arg2,Text
+Bg,room,0.5,
+Wait,500,,
+Text,,,こんにちは
 ```
 
-タグ名に `alpha` / `beta` / `rc` が含まれる場合は自動的に Pre-release 扱いになります。
+`LoadTable<TField>` で読み込むと、列名を文字列で記述せずにアクセスできます。
 
-```bash
-git tag v1.0.0-beta
-git push origin v1.0.0-beta
+```csharp
+using CSV4Unity;
+using UnityEngine;
+
+public sealed class ScenarioReader : MonoBehaviour
+{
+    [SerializeField] private TextAsset scenarioCsv;
+
+    private void Start()
+    {
+        CsvTable<ScenarioField> table = CSVLoader.LoadTable<ScenarioField>(scenarioCsv);
+
+        string command = table.Row(0)[ScenarioField.Command].GetString();
+        float duration = table.Row(0)[ScenarioField.Arg2].Get<float>();
+        int milliseconds = table.Row(1)[ScenarioField.Arg1].Get<int>();
+    }
+}
 ```
 
-### 手動実行（workflow_dispatch）
+同じ `Arg1` 列でも、行のCommandに応じて異なる型として取得できます。
 
-Actions タブ → **Build & Release** → **Run workflow** から実行できます。ビルドターゲットやリリース設定を個別に選択できます。
+```csharp
+string background = table.Row(0)[ScenarioField.Arg1].GetString();
+int milliseconds = table.Row(1)[ScenarioField.Arg1].Get<int>();
+```
 
-| 項目 | 説明 |
-|---|---|
-| Version | バージョン番号（例：`1.0.0`） |
-| Build for Windows | Windows ビルドを行うか |
-| Build for WebGL | WebGL ビルドを行うか |
-| Create GitHub Release | GitHub Release を作成するか（Windows ビルド必須） |
-| Deploy WebGL to GitHub Pages | GitHub Pages にデプロイするか（WebGL ビルド必須） |
-| Create as draft release | ドラフトとして作成するか |
-| Mark as pre-release | Pre-release としてマークするか |
+## ヘッダー名・列番号で読む
 
----
+Enumが不要な場合は `CsvDocument` を使用します。
 
-## リリース成果物
+```csharp
+CsvDocument document = CSVLoader.LoadDocument(csvAsset);
 
-Windows ビルド時に以下が生成されます。
+string name = document.Row(0)["Name"].GetString();
+int level = document.Column("Level")[0].Get<int>();
+```
 
-| ファイル | 内容 |
-|---|---|
-| `{app_exe_name}-Setup-v{version}.exe` | Inno Setup インストーラー（推奨） |
-| `{app_exe_name}-v{version}-Windows.zip` | ポータブル版（ZIP） |
+ヘッダーなしCSVは列番号で参照します。
 
----
+```csharp
+var options = new CsvParseOptions { HasHeader = false };
+CsvDocument document = CSVLoader.LoadDocument("Wait,500\nText,Hello", options);
 
-## 注意事項
+string command = document.Row(0)[0].GetString();
+int argument = document.Row(0)[1].Get<int>();
+```
 
-### Unity の Build Name
+## 列アクセスと検索
 
-`project.yml` の `app_exe_name` は Unity プロジェクトの **Build Name**（Game-CI の `buildName` オプション）と一致させてください。Unity エディターの Build Settings の Product Name ではありません。
+```csharp
+CsvColumn<ScenarioField> commands = table.Column(ScenarioField.Command);
 
-### cleanup-build.ps1
+for (int rowIndex = 0; rowIndex < commands.Count; rowIndex++)
+{
+    Debug.Log(commands[rowIndex].GetString());
+}
+```
 
-`Build & Release` ワークフローのインストーラー作成前に、開発用途のみのフォルダ（`DoNotShip` など）を削除するスクリプトです。必要に応じて削除対象を追加してください。
+同じ列を繰り返し検索する場合だけ、明示的にインデックスを作成します。
+
+```csharp
+CsvIndex<string> index = CsvIndex<string>.Create(commands);
+
+if (index.TryFindFirst("Text", out int rowIndex))
+{
+    CsvRow<ScenarioField> row = table.Row(rowIndex);
+}
+```
+
+## Validation
+
+Enumフィールドへ制約属性を付けます。
+
+```csharp
+using CSV4Unity.Validation;
+
+public enum CharacterField
+{
+    [PrimaryKey]
+    [TypeConstraint(typeof(int))]
+    Id,
+
+    [NotNull]
+    [MaxLength(32)]
+    Name,
+
+    [Range(1, 100)]
+    Level
+}
+```
+
+読み込みとValidationは分離されています。必要な場所で明示的に実行してください。
+
+```csharp
+CsvTable<CharacterField> table = CSVLoader.LoadTable<CharacterField>(csvAsset);
+CsvValidationResult result = CsvValidator.Validate(table);
+
+foreach (ValidationError error in result.Errors)
+{
+    Debug.LogError(error);
+}
+```
+
+利用可能な制約は `PrimaryKey`、`NotNull`、`Unique`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、`MinLength`、`MaxLength`、`ForeignKey` です。
+
+## Inspector Validation
+
+1. `CSV4Unity.Fields` 名前空間へValidation用Enumを定義します。
+2. UnityのProjectウィンドウでCSVを選択します。
+3. Inspectorの `Validation Schema` からEnumを選択します。
+4. `Validate CSV` を実行します。
+
+## Parser設定
+
+```csharp
+var options = new CsvParseOptions
+{
+    HasHeader = true,
+    Delimiter = ',',
+    IgnoreEmptyRecords = true,
+    TrimUnquotedFields = true
+};
+```
+
+## 設計資料
+
+- [日本語コア設計](./docs/ja/architecture.md)
+- [English core architecture](./docs/en/architecture.md)
+
+## 開発用ファイル
+
+`Assets/Scripts` と `Assets/TestData/CSV4Unity` は、このリポジトリ自身のExample・テスト用です。UPMで指定する `Assets/Plugins/CSVLoader` には含まれません。
+
+## ライセンス
+
+[MIT License](./LICENSE)

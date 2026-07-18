@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a4bac0244b1716b4c95d69faa791c51e
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - scenarioCsv: {fileID: 4900000, guid: 0eda03e41d068ec4183071b6fe0cff83, type: 3}
+  - hugeDataCsv: {fileID: 4900000, guid: 939f9877eaf38664893456a19a4db82f, type: 3}
+  - headerlessCsv: {fileID: 4900000, guid: 939f9877eaf38664893456a19a4db82f, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
