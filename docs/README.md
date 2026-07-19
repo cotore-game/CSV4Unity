@@ -35,11 +35,13 @@ GitHubでは`main`または`develop`へのpush時にDocFXをビルドし、`main
 
 GameCIでPersonal Licenseを使用するため、Repository Secretsへ次の値を設定します。
 
-- `UNITY_LICENSE`
+- `UNITY_LICENSE`: Unity Personal Licenseファイル（`.ulf`）の全文
 - `UNITY_EMAIL`
 - `UNITY_PASSWORD`
 
-テストが失敗した場合も、XML結果とEditorログを`unity-editmode-test-results` Artifactとして保存します。
+ライセンスファイルの取得方法は、[GameCI公式のActivation手順](https://game.ci/docs/github/activation/)を参照してください。これらのSecretが未設定の場合、Unity Editorを起動できないためテストは失敗します。
+
+Unityがテスト出力を生成した場合は、失敗時もXML結果とEditorログを`unity-editmode-test-results` Artifactとして保存します。ライセンスエラーなどで出力自体が作られなかった場合、Artifactのアップロードは警告だけを残してスキップします。
 
 ### ローカル生成
 
