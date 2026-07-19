@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -24,6 +25,37 @@ namespace CSV4Unity.Tests
         {
             Command,
             NotInCsv
+        }
+
+        private enum RenamedField
+        {
+            [CsvHeader("Item ID")]
+            ItemId,
+
+            [CsvHeader("DISPLAY NAME", IgnoreCase = true)]
+            DisplayName
+        }
+
+        private enum PatternField
+        {
+            [CsvHeaderPattern(@"item[_\s-]?id", RegexOptions.IgnoreCase)]
+            ItemId
+        }
+
+        private enum DuplicateColumnField
+        {
+            [CsvHeader("Id")]
+            Id,
+
+            [CsvHeaderPattern("Id")]
+            Identifier
+        }
+
+        private enum ConflictingAttributeField
+        {
+            [CsvHeader("Id")]
+            [CsvHeaderPattern("Id")]
+            Id
         }
 
         [Test]
@@ -88,6 +120,61 @@ namespace CSV4Unity.Tests
             CsvDocument document = CsvParser.Parse("Command,Arg1\nWait,1");
 
             Assert.Throws<CsvSchemaException>(() => CsvEnumSchema<MissingField>.Bind(document));
+        }
+
+        [Test]
+        public void EnumSchema_HeaderAttribute_MapsRenamedAndCaseInsensitiveHeaders()
+        {
+            CsvDocument document = CsvParser.Parse("Item ID,display name\n10,Potion");
+
+            CsvTable<RenamedField> table = document.WithFields<RenamedField>();
+
+            Assert.That(table.Row(0)[RenamedField.ItemId].GetInt32(), Is.EqualTo(10));
+            Assert.That(table.Row(0)[RenamedField.DisplayName].GetString(), Is.EqualTo("Potion"));
+        }
+
+        [TestCase("item_id")]
+        [TestCase("Item ID")]
+        [TestCase("ITEM-ID")]
+        public void EnumSchema_HeaderPattern_MapsWholeHeader(string header)
+        {
+            CsvDocument document = CsvParser.Parse($"{header}\n10");
+
+            CsvTable<PatternField> table = document.WithFields<PatternField>();
+
+            Assert.That(table.Row(0)[PatternField.ItemId].GetInt32(), Is.EqualTo(10));
+        }
+
+        [Test]
+        public void EnumSchema_HeaderPattern_DoesNotUseSubstringMatch()
+        {
+            CsvDocument document = CsvParser.Parse("prefix_item_id_suffix\n10");
+
+            Assert.Throws<CsvSchemaException>(() => document.WithFields<PatternField>());
+        }
+
+        [Test]
+        public void EnumSchema_HeaderMappingWithMultipleMatches_ThrowsSchemaException()
+        {
+            CsvDocument document = CsvParser.Parse("item_id,ITEM-ID\n10,20");
+
+            Assert.Throws<CsvSchemaException>(() => document.WithFields<PatternField>());
+        }
+
+        [Test]
+        public void EnumSchema_FieldsMappedToSameColumn_ThrowsSchemaException()
+        {
+            CsvDocument document = CsvParser.Parse("Id\n10");
+
+            Assert.Throws<CsvSchemaException>(() => document.WithFields<DuplicateColumnField>());
+        }
+
+        [Test]
+        public void EnumSchema_FieldWithTwoMappingAttributes_ThrowsSchemaException()
+        {
+            CsvDocument document = CsvParser.Parse("Id\n10");
+
+            Assert.Throws<CsvSchemaException>(() => document.WithFields<ConflictingAttributeField>());
         }
 
         [Test]

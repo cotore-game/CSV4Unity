@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using CSV4Unity.Validation;
 
 namespace CSV4Unity.Fields
@@ -10,6 +11,21 @@ namespace CSV4Unity.Fields
         Id,
         Text,
         Note
+    }
+
+    /// <summary>
+    /// HeaderMapping.csvのヘッダー補正を確認する手動確認用スキーマです。
+    /// </summary>
+    public enum HeaderMappingFields
+    {
+        [CsvHeader("Item ID")]
+        Id,
+
+        [CsvHeaderPattern(@"display[_\s-]?name", RegexOptions.IgnoreCase)]
+        DisplayName,
+
+        [CsvHeader("enabled", IgnoreCase = true)]
+        Enabled
     }
 
     /// <summary>
