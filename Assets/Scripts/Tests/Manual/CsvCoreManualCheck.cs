@@ -28,6 +28,10 @@ namespace CSV4Unity.Tests.Manual
         private TextAsset hugeDataCsv;
 
         [SerializeField]
+        [Tooltip("Assets/TestData/CSV4Unity/HeaderMapping.csv を指定してください")]
+        private TextAsset headerMappingCsv;
+
+        [SerializeField]
         private bool runOnStart = true;
 
         private void Start()
@@ -47,6 +51,7 @@ namespace CSV4Unity.Tests.Manual
                 CheckRfc4180(ref passed);
                 CheckValidation(ref passed);
                 CheckLargeCsv(ref passed);
+                CheckHeaderMapping(ref passed);
 
                 Debug.Log($"[CSV4Unity Check] PASS: {passed} checks completed.", this);
             }
@@ -103,12 +108,24 @@ namespace CSV4Unity.Tests.Manual
             passed += 2;
         }
 
+        private void CheckHeaderMapping(ref int passed)
+        {
+            CsvTable<HeaderMappingFields> table = CSVLoader.LoadTable<HeaderMappingFields>(headerMappingCsv);
+
+            Require(table.Row(0)[HeaderMappingFields.Id].GetInt32() == 10, "CsvHeaderでItem IDをIdへ対応付けられません。");
+            Require(table.Row(0)[HeaderMappingFields.DisplayName].GetString() == "Potion", "CsvHeaderPatternでdisplay-nameを対応付けられません。");
+            Require(table.Row(0)[HeaderMappingFields.Enabled].GetBoolean(), "CsvHeaderのIgnoreCaseが機能していません。");
+
+            passed += 3;
+        }
+
         private void EnsureFixturesAssigned()
         {
             Require(scenarioCsv != null, "scenarioCsv に Scenario.csv を指定してください。");
             Require(rfc4180Csv != null, "rfc4180Csv に Rfc4180.csv を指定してください。");
             Require(invalidValidationCsv != null, "invalidValidationCsv に ValidationInvalid.csv を指定してください。");
             Require(hugeDataCsv != null, "hugeDataCsv に HugeData.csv を指定してください。");
+            Require(headerMappingCsv != null, "headerMappingCsv に HeaderMapping.csv を指定してください。");
         }
 
         private static void Require(bool condition, string message)
