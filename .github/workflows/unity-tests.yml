@@ -51,5 +51,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unity-editmode-test-results
-          path: ${{ steps.tests.outputs.artifactsPath }}
+          path: artifacts/editmode
           if-no-files-found: warn
