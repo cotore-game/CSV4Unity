@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: unity-tests-main
+  group: unity-tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
