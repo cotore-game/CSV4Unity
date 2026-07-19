@@ -107,13 +107,24 @@ namespace CSV4Unity
             }
 
             string expectedHeader = header?.Name ?? fieldName;
-            StringComparison comparison = header?.IgnoreCase == true
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal;
+            if (header?.IgnoreCase != true)
+            {
+                try
+                {
+                    return document.GetColumnIndex(expectedHeader);
+                }
+                catch (KeyNotFoundException exception)
+                {
+                    throw new CsvSchemaException(
+                        $"CSV header matching '{expectedHeader}' required by enum field '{typeof(TField).Name}.{fieldName}' was not found.",
+                        exception);
+                }
+            }
+
             return FindUniqueColumn(
                 document,
                 fieldName,
-                candidate => string.Equals(candidate, expectedHeader, comparison),
+                candidate => string.Equals(candidate, expectedHeader, StringComparison.OrdinalIgnoreCase),
                 expectedHeader);
         }
 
