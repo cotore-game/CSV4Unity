@@ -3,6 +3,7 @@
 CSV4Unityを開発・保守する人向けの資料です。
 
 - [日本語: コア設計](ja/architecture.md)
+- [日本語: ベンチマーク](ja/benchmark.md)
 - [English: Core architecture](en/architecture.md)
 
 現時点では日本語版を正本として更新します。英語版は設計が安定した段階で追従させます。
@@ -26,7 +27,19 @@ DocFX専用ビルドでは、公開APIのXMLコメント欠落、引数タグの
 - GitHub Actions: `.github/workflows/docs.yml`
 - 公開先: <https://cotore-game.github.io/CSV4Unity/>
 
-GitHubではPR時にビルドだけを検証し、`main`へのpush、Release公開、手動実行時にGitHub Pagesへデプロイします。リポジトリのSettingsから、PagesのSourceを `GitHub Actions` に設定する必要があります。
+GitHubでは`main`または`develop`へのpush時にDocFXをビルドし、`main`だけをGitHub Pagesへデプロイします。作業ブランチとPull Requestでは実行しません。リポジトリのSettingsから、PagesのSourceを `GitHub Actions` に設定する必要があります。
+
+## Unityテスト
+
+`.github/workflows/unity-tests.yml`は、`main`へのpush時にEditModeテストを実行します。作業ブランチとPull Requestでは実行しません。
+
+GameCIでPersonal Licenseを使用するため、Repository Secretsへ次の値を設定します。
+
+- `UNITY_LICENSE`
+- `UNITY_EMAIL`
+- `UNITY_PASSWORD`
+
+テストが失敗した場合も、XML結果とEditorログを`unity-editmode-test-results` Artifactとして保存します。
 
 ### ローカル生成
 

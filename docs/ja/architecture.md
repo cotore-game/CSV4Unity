@@ -96,12 +96,14 @@ CsvRow / CsvColumn / CsvCell
 | 型 | 役割 |
 |---|---|
 | `CsvEnumSchema<TField>` | Enum値とCSV列番号を対応付ける |
+| `CsvHeaderAttribute` | Enum名と異なるヘッダー名を指定する |
+| `CsvHeaderPatternAttribute` | 複数表記を正規表現で一意に対応付ける |
 | `CsvTable<TField>` | `CsvDocument` とEnumスキーマを組み合わせる |
 | `CsvRow<TField>` | Enumを使って1行のセルへアクセスする |
 | `CsvColumn<TField>` | Enumで選択した列へアクセスする |
 | `CsvSchemaException` | 必須ヘッダー不足などのスキーマ不一致を表す |
 
-Enum名とCSVヘッダー名は一致している必要があります。
+属性を指定しない場合、Enum名とCSVヘッダー名は大文字小文字まで一致している必要があります。
 
 ```csharp
 public enum ScenarioField
@@ -117,6 +119,33 @@ public enum ScenarioField
 Command,Arg1,Arg2,Text
 Text,,,こんにちは
 ```
+
+CSV側の命名を変更できない場合は `CsvHeader` で別名を指定できます。
+
+```csharp
+public enum ItemField
+{
+    [CsvHeader("Item ID")]
+    Id,
+
+    [CsvHeader("DISPLAY NAME", IgnoreCase = true)]
+    DisplayName
+}
+```
+
+複数の表記を許可する必要がある場合だけ `CsvHeaderPattern` を使用します。パターンは部分一致ではなくヘッダー名全体へ適用されます。
+
+```csharp
+using System.Text.RegularExpressions;
+
+public enum ItemField
+{
+    [CsvHeaderPattern(@"item[_\s-]?id", RegexOptions.IgnoreCase)]
+    Id
+}
+```
+
+対応候補が0件または複数件の場合や、複数のEnumフィールドが同じCSV列へ対応した場合は、曖昧なスキーマとして `CsvSchemaException` を送出します。
 
 ### 型変換
 

@@ -267,6 +267,7 @@ GameObject:
   - component: {fileID: 1236170039}
   - component: {fileID: 1236170040}
   - component: {fileID: 1236170041}
+  - component: {fileID: 1236170042}
   m_Layer: 0
   m_Name: ExampleScript
   m_TagString: Untagged
@@ -319,6 +320,23 @@ MonoBehaviour:
   rfc4180Csv: {fileID: 4900000, guid: f66e0520e7494d7480f7a8ccc03d79d8, type: 3}
   invalidValidationCsv: {fileID: 4900000, guid: e75038cd7b06493b9628c76b6435892c, type: 3}
   hugeDataCsv: {fileID: 4900000, guid: 939f9877eaf38664893456a19a4db82f, type: 3}
+  headerMappingCsv: {fileID: 4900000, guid: 3e1b4ae2b01148cb9ff03a7e6b8921aa, type: 3}
+  runOnStart: 1
+--- !u!114 &1236170042
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1236170038}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2628142314eb492489efaf71804933c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rowCount: 10000
+  measurementIterations: 10
+  indexedLookupCount: 100000
   runOnStart: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

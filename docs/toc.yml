@@ -4,5 +4,7 @@
   href: api/
 - name: コア設計（日本語）
   href: ja/architecture.md
+- name: ベンチマーク（日本語）
+  href: ja/benchmark.md
 - name: Core architecture (English)
   href: en/architecture.md

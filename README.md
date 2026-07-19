@@ -19,6 +19,7 @@ CSVをクラスへ一括変換せず、セルを必要なときに指定した�
 
 - RFC 4180形式のクォート、カンマ、二重引用符、クォート内改行を解析
 - Enumによる列指定
+- 属性によるEnum名とCSVヘッダー名の補正
 - ヘッダー名・列番号による非ジェネリックアクセス
 - 行アクセスと列アクセス
 - 必要なセルだけを明示的に型変換
@@ -84,6 +85,35 @@ public sealed class ScenarioReader : MonoBehaviour
 string background = table.Row(0)[ScenarioField.Arg1].GetString();
 int milliseconds = table.Row(1)[ScenarioField.Arg1].Get<int>();
 ```
+
+### Enum名と異なるヘッダーを使う
+
+通常の別名には `CsvHeader` を使用します。`IgnoreCase` を有効にすると、大文字小文字を区別しません。
+
+```csharp
+public enum ItemField
+{
+    [CsvHeader("Item ID")]
+    Id,
+
+    [CsvHeader("DISPLAY NAME", IgnoreCase = true)]
+    DisplayName
+}
+```
+
+複数の表記を許可する必要がある場合だけ `CsvHeaderPattern` を使用します。正規表現はヘッダー名全体へ適用されます。
+
+```csharp
+using System.Text.RegularExpressions;
+
+public enum ItemField
+{
+    [CsvHeaderPattern(@"item[_\s-]?id", RegexOptions.IgnoreCase)]
+    Id
+}
+```
+
+属性を指定しないフィールドは、従来どおりEnum名とヘッダー名を大文字小文字まで含めて比較します。候補が0件または複数件の場合や、複数のEnumフィールドが同じ列へ対応した場合は `CsvSchemaException` が送出されます。
 
 ## ヘッダー名・列番号で読む
 

@@ -5,7 +5,7 @@ namespace CSV4Unity
     /// <summary>
     /// CsvDocumentとEnumスキーマを組み合わせ、Enumによる列アクセスを提供します。
     /// </summary>
-    /// <typeparam name="TField">CSVヘッダーと同名のフィールドを持つEnum型。</typeparam>
+    /// <typeparam name="TField">CSVの列を表すEnum型。属性でヘッダー名を補正できます。</typeparam>
     public sealed class CsvTable<TField> where TField : struct, Enum
     {
         internal CsvTable(CsvDocument document)

@@ -48,7 +48,7 @@ namespace CSV4Unity
         /// <summary>
         /// TextAssetを解析し、Enumで列を指定できるテーブルを返します。
         /// </summary>
-        /// <typeparam name="TField">CSVヘッダーと同名のフィールドを持つEnum型。</typeparam>
+        /// <typeparam name="TField">CSVの列を表すEnum型。属性でヘッダー名を補正できます。</typeparam>
         /// <param name="csvFile">解析するCSVを保持したTextAsset。</param>
         /// <param name="options">解析方法。<see langword="null"/>の場合は既定値を使用します。</param>
         /// <param name="dataName">ドキュメントの識別名。<see langword="null"/>の場合はTextAsset名を使用します。</param>
@@ -69,7 +69,7 @@ namespace CSV4Unity
         /// <summary>
         /// CSV文字列を解析し、Enumで列を指定できるテーブルを返します。
         /// </summary>
-        /// <typeparam name="TField">CSVヘッダーと同名のフィールドを持つEnum型。</typeparam>
+        /// <typeparam name="TField">CSVの列を表すEnum型。属性でヘッダー名を補正できます。</typeparam>
         /// <param name="csvText">解析するCSV文字列。</param>
         /// <param name="options">解析方法。<see langword="null"/>の場合は既定値を使用します。</param>
         /// <param name="dataName">ドキュメントの識別名。<see langword="null"/>の場合は空文字列を使用します。</param>
