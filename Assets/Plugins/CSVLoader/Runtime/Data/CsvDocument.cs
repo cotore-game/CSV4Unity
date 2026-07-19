@@ -104,7 +104,7 @@ namespace CSV4Unity
         }
 
         /// <summary>Enumとヘッダーを対応付けたテーブルを生成します。</summary>
-        /// <typeparam name="TField">CSVヘッダーと同名のフィールドを持つEnum型。</typeparam>
+        /// <typeparam name="TField">CSVの列を表すEnum型。属性でヘッダー名を補正できます。</typeparam>
         /// <returns>Enumで列を指定できるテーブル。</returns>
         /// <exception cref="CsvSchemaException">ヘッダーがないか、Enumの各フィールドをヘッダーへ一意に対応付けられません。</exception>
         public CsvTable<TField> WithFields<TField>() where TField : struct, Enum
