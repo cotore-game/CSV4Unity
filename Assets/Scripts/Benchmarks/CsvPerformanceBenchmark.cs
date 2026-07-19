@@ -185,7 +185,11 @@ namespace CSV4Unity.Benchmarks
 
         private static string CreateCsv(int rows)
         {
-            var builder = new StringBuilder(rows * 64);
+            // 巨大な行数でも、初期確保だけでメモリを使い切らないよう推定容量に上限を設けます。
+            const int estimatedCharactersPerRow = 64;
+            const int maximumInitialCapacity = 16 * 1024 * 1024;
+            int initialCapacity = (int)Math.Min((long)rows * estimatedCharactersPerRow, maximumInitialCapacity);
+            var builder = new StringBuilder(initialCapacity);
             builder.AppendLine("Id,Group,Enabled,Score,Name,Text");
 
             for (int rowIndex = 0; rowIndex < rows; rowIndex++)
