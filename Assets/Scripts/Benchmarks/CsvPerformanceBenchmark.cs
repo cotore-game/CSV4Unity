@@ -122,13 +122,17 @@ namespace CSV4Unity.Benchmarks
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
 
-                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                long allocatedBefore = supportsThreadAllocationCounter
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0;
                 long managedHeapBefore = GC.GetTotalMemory(false);
                 long startedAt = Stopwatch.GetTimestamp();
                 action();
                 long finishedAt = Stopwatch.GetTimestamp();
                 long managedHeapAfter = GC.GetTotalMemory(false);
-                long allocatedAfter = GC.GetAllocatedBytesForCurrentThread();
+                long allocatedAfter = supportsThreadAllocationCounter
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0;
 
                 elapsedTicks[i] = finishedAt - startedAt;
                 allocatedBytes[i] = supportsThreadAllocationCounter
