@@ -294,31 +294,54 @@ namespace CSV4Unity.Editor
 
         private static string GetAttributeDisplayText(Attribute attribute)
         {
+            string label;
             switch (attribute)
             {
+                case ConditionAttribute condition:
+                    string values = condition.Values.Length == 0
+                        ? string.Empty
+                        : $" {string.Join("|", condition.Values)}";
+                    string group = condition.Group == 0 ? string.Empty : $" Group {condition.Group}:";
+                    return $"[Condition:{group} {condition.Field} {condition.Comparison}{values}]";
                 case PrimaryKeyAttribute:
-                    return "[PrimaryKey]";
+                    label = "PrimaryKey";
+                    break;
                 case NotNullAttribute:
-                    return "[NotNull]";
+                    label = "NotNull";
+                    break;
                 case UniqueAttribute:
-                    return "[Unique]";
+                    label = "Unique";
+                    break;
                 case TypeConstraintAttribute typeConstraint:
-                    return $"[Type: {typeConstraint.ExpectedType.Name}]";
+                    label = $"Type: {typeConstraint.ExpectedType.Name}";
+                    break;
                 case Validation.RangeAttribute range:
-                    return $"[Range: {range.Min}-{range.Max}]";
+                    label = $"Range: {range.Min}-{range.Max}";
+                    break;
                 case RegexAttribute regex:
-                    return $"[Regex: {regex.Pattern}]";
+                    label = $"Regex: {regex.Pattern}";
+                    break;
                 case AllowedValuesAttribute allowed:
-                    return $"[Allowed: {string.Join("|", allowed.AllowedValues)}]";
+                    label = $"Allowed: {string.Join("|", allowed.AllowedValues)}";
+                    break;
                 case MinLengthAttribute minLength:
-                    return $"[MinLength: {minLength.MinLength}]";
+                    label = $"MinLength: {minLength.MinLength}";
+                    break;
                 case MaxLengthAttribute maxLength:
-                    return $"[MaxLength: {maxLength.MaxLength}]";
+                    label = $"MaxLength: {maxLength.MaxLength}";
+                    break;
                 case ForeignKeyAttribute foreignKey:
-                    return $"[ForeignKey: {foreignKey.ReferenceEnumType.Name}.{foreignKey.ReferenceField}]";
+                    label = $"ForeignKey: {foreignKey.ReferenceEnumType.Name}.{foreignKey.ReferenceField}";
+                    break;
                 default:
                     return null;
             }
+
+            var validation = (CsvValidationAttribute)attribute;
+            string conditionGroup = validation.ConditionGroup == 0
+                ? string.Empty
+                : $", Group: {validation.ConditionGroup}";
+            return $"[{label}{conditionGroup}]";
         }
 
         private static CsvValidationResult ValidateDocument<TField>(CsvDocument document)

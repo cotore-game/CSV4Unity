@@ -11,7 +11,7 @@ namespace CSV4Unity.Validation
     public static class CsvValidator
     {
         /// <summary>
-        /// Enumの制約属性に従ってテーブルを検証します。読み込んだデータ自体は変更しません。
+        /// Enumの制約属性と行条件に従ってテーブルを検証します。読み込んだデータ自体は変更しません。
         /// </summary>
         /// <typeparam name="TField">列と制約属性を定義したEnum型。</typeparam>
         /// <param name="table">検証するEnum対応テーブル。</param>
@@ -19,13 +19,12 @@ namespace CSV4Unity.Validation
         /// 使用するValidationスキーマ。<see langword="null"/>の場合は<see cref="CsvValidationSchema{TField}.Default"/>を使用します。
         /// </param>
         /// <param name="context">ForeignKeyの参照先テーブル。参照先が同じテーブルだけの場合は<see langword="null"/>にできます。</param>
-        /// <param name="formatProvider">型変換と数値範囲検証に使用する形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
+        /// <param name="formatProvider">型変換、数値比較、数値範囲検証に使用する形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
         /// <returns>すべてのエラーとWarningを格納したValidation結果。</returns>
         /// <exception cref="ArgumentNullException"><paramref name="table"/>が<see langword="null"/>です。</exception>
         /// <remarks>
-        /// PrimaryKeyは空でなく一意、Uniqueは空セルを除いて一意であることを大文字小文字を区別して検証します。
-        /// ForeignKeyの参照テーブルまたは列を解決できない場合、その制約を実行せずWarningを追加します。
-        /// 空セルはPrimaryKeyとNotNullを除くセル単位制約の対象外です。
+        /// 同じConditionグループの条件はANDとして評価され、条件が成立した行だけ対応するValidation属性を適用します。
+        /// 条件を持たない属性は従来どおりすべての行へ適用されます。
         /// </remarks>
         public static CsvValidationResult Validate<TField>(
             CsvTable<TField> table,
@@ -43,13 +42,13 @@ namespace CSV4Unity.Validation
             IReadOnlyList<CsvFieldValidationRule<TField>> rules = schema.Rules;
             for (int i = 0; i < rules.Count; i++)
             {
-                ValidateField(table, rules[i], context, provider, result);
+                ValidateRule(table, rules[i], context, provider, result);
             }
 
             return result;
         }
 
-        private static void ValidateField<TField>(
+        private static void ValidateRule<TField>(
             CsvTable<TField> table,
             CsvFieldValidationRule<TField> rule,
             CsvValidationContext context,
@@ -59,29 +58,38 @@ namespace CSV4Unity.Validation
         {
             CsvColumn<TField> column = table.Column(rule.Field);
 
-            // 列全体の制約は行ループの外で一度だけ検証する。
-            if (rule.IsPrimaryKey)
+            if (rule.Kind == CsvValidationRuleKind.PrimaryKey)
             {
-                ValidateDistinct(column, rule.FieldName, true, result);
-            }
-            else if (rule.IsUnique)
-            {
-                ValidateDistinct(column, rule.FieldName, false, result);
+                ValidateDistinct(table, column, rule, true, formatProvider, result);
+                return;
             }
 
-            HashSet<string> referenceValues = PrepareForeignKeyValues(table, rule, context, result);
+            if (rule.Kind == CsvValidationRuleKind.Unique)
+            {
+                ValidateDistinct(table, column, rule, false, formatProvider, result);
+                return;
+            }
+
+            HashSet<string> referenceValues = rule.Kind == CsvValidationRuleKind.ForeignKey
+                ? PrepareForeignKeyValues(table, rule, context, result)
+                : null;
 
             for (int rowIndex = 0; rowIndex < column.Count; rowIndex++)
             {
-                CsvCell cell = column[rowIndex];
+                if (!CsvConditionEvaluator.Matches(table, rowIndex, rule.Conditions, formatProvider)) continue;
 
-                if (rule.IsRequired && !rule.IsPrimaryKey && cell.IsEmpty)
+                CsvCell cell = column[rowIndex];
+                if (rule.Kind == CsvValidationRuleKind.NotNull)
                 {
-                    result.AddError(rowIndex, rule.FieldName, "Value cannot be empty.");
+                    if (cell.IsEmpty && !rule.SuppressRequiredError)
+                    {
+                        result.AddError(rowIndex, rule.FieldName, "Value cannot be empty.");
+                    }
+
+                    continue;
                 }
 
                 if (cell.IsEmpty) continue;
-
                 ValidateCell(cell, rowIndex, rule, formatProvider, referenceValues, result);
             }
         }
@@ -95,74 +103,107 @@ namespace CSV4Unity.Validation
             CsvValidationResult result)
             where TField : struct, Enum
         {
-            if (rule.ExpectedType != null && !cell.CanGet(rule.ExpectedType, formatProvider))
+            switch (rule.Kind)
             {
-                result.AddError(
-                    rowIndex,
-                    rule.FieldName,
-                    $"Value '{cell.GetString()}' cannot be converted to {rule.ExpectedType.Name}.");
-            }
-
-            if (rule.RangeMin.HasValue)
-            {
-                if (!cell.TryGet(out double value, formatProvider))
-                {
-                    if (rule.ExpectedType == null)
+                case CsvValidationRuleKind.TypeConstraint:
+                    if (!cell.CanGet(rule.ExpectedType, formatProvider))
                     {
-                        result.AddError(rowIndex, rule.FieldName, "Range validation requires a numeric value.");
+                        result.AddError(
+                            rowIndex,
+                            rule.FieldName,
+                            $"Value '{cell.GetString()}' cannot be converted to {rule.ExpectedType.Name}.");
                     }
-                }
-                else if (value < rule.RangeMin.Value || value > rule.RangeMax.Value)
+
+                    break;
+
+                case CsvValidationRuleKind.Range:
+                    if (!cell.TryGet(out double value, formatProvider))
+                    {
+                        if (!rule.SuppressNumericError)
+                        {
+                            result.AddError(rowIndex, rule.FieldName, "Range validation requires a numeric value.");
+                        }
+                    }
+                    else if (value < rule.RangeMin || value > rule.RangeMax)
+                    {
+                        result.AddError(
+                            rowIndex,
+                            rule.FieldName,
+                            $"Value {value} is outside the range [{rule.RangeMin}, {rule.RangeMax}].");
+                    }
+
+                    break;
+
+                case CsvValidationRuleKind.Regex:
                 {
-                    result.AddError(
-                        rowIndex,
-                        rule.FieldName,
-                        $"Value {value} is outside the range [{rule.RangeMin.Value}, {rule.RangeMax.Value}].");
+                    string text = cell.GetString();
+                    if (!rule.Pattern.IsMatch(text))
+                    {
+                        result.AddError(rowIndex, rule.FieldName, $"Value '{text}' does not match the required pattern.");
+                    }
+
+                    break;
                 }
-            }
 
-            bool requiresString = rule.Pattern != null || rule.AllowedValues != null ||
-                                  rule.MinLength.HasValue || rule.MaxLength.HasValue ||
-                                  referenceValues != null;
-            if (!requiresString) return;
+                case CsvValidationRuleKind.AllowedValues:
+                {
+                    string text = cell.GetString();
+                    if (!rule.AllowedValues.Contains(text))
+                    {
+                        result.AddError(rowIndex, rule.FieldName, $"Value '{text}' is not allowed.");
+                    }
 
-            string text = cell.GetString();
-            if (rule.Pattern != null && !rule.Pattern.IsMatch(text))
-            {
-                result.AddError(rowIndex, rule.FieldName, $"Value '{text}' does not match the required pattern.");
-            }
+                    break;
+                }
 
-            if (rule.AllowedValues != null && !rule.AllowedValues.Contains(text))
-            {
-                result.AddError(rowIndex, rule.FieldName, $"Value '{text}' is not allowed.");
-            }
+                case CsvValidationRuleKind.MinLength:
+                {
+                    int length = cell.GetString().Length;
+                    if (length < rule.MinLength)
+                    {
+                        result.AddError(
+                            rowIndex,
+                            rule.FieldName,
+                            $"Length {length} is less than the minimum {rule.MinLength}.");
+                    }
 
-            if (rule.MinLength.HasValue && text.Length < rule.MinLength.Value)
-            {
-                result.AddError(
-                    rowIndex,
-                    rule.FieldName,
-                    $"Length {text.Length} is less than the minimum {rule.MinLength.Value}.");
-            }
+                    break;
+                }
 
-            if (rule.MaxLength.HasValue && text.Length > rule.MaxLength.Value)
-            {
-                result.AddError(
-                    rowIndex,
-                    rule.FieldName,
-                    $"Length {text.Length} exceeds the maximum {rule.MaxLength.Value}.");
-            }
+                case CsvValidationRuleKind.MaxLength:
+                {
+                    int length = cell.GetString().Length;
+                    if (length > rule.MaxLength)
+                    {
+                        result.AddError(
+                            rowIndex,
+                            rule.FieldName,
+                            $"Length {length} exceeds the maximum {rule.MaxLength}.");
+                    }
 
-            if (referenceValues != null && !referenceValues.Contains(text))
-            {
-                result.AddError(rowIndex, rule.FieldName, $"Referenced value '{text}' was not found.");
+                    break;
+                }
+
+                case CsvValidationRuleKind.ForeignKey:
+                    if (referenceValues != null)
+                    {
+                        string text = cell.GetString();
+                        if (!referenceValues.Contains(text))
+                        {
+                            result.AddError(rowIndex, rule.FieldName, $"Referenced value '{text}' was not found.");
+                        }
+                    }
+
+                    break;
             }
         }
 
         private static void ValidateDistinct<TField>(
+            CsvTable<TField> table,
             CsvColumn<TField> column,
-            string fieldName,
+            CsvFieldValidationRule<TField> rule,
             bool requireValue,
+            IFormatProvider formatProvider,
             CsvValidationResult result)
             where TField : struct, Enum
         {
@@ -170,12 +211,14 @@ namespace CSV4Unity.Validation
 
             for (int rowIndex = 0; rowIndex < column.Count; rowIndex++)
             {
+                if (!CsvConditionEvaluator.Matches(table, rowIndex, rule.Conditions, formatProvider)) continue;
+
                 CsvCell cell = column[rowIndex];
                 if (cell.IsEmpty)
                 {
                     if (requireValue)
                     {
-                        result.AddError(rowIndex, fieldName, "Primary key cannot be empty.");
+                        result.AddError(rowIndex, rule.FieldName, "Primary key cannot be empty.");
                     }
 
                     continue;
@@ -185,7 +228,7 @@ namespace CSV4Unity.Validation
                 if (!seen.Add(value))
                 {
                     string constraint = requireValue ? "primary key" : "unique";
-                    result.AddError(rowIndex, fieldName, $"Duplicate {constraint} value: '{value}'.");
+                    result.AddError(rowIndex, rule.FieldName, $"Duplicate {constraint} value: '{value}'.");
                 }
             }
         }
@@ -197,8 +240,6 @@ namespace CSV4Unity.Validation
             CsvValidationResult result)
             where TField : struct, Enum
         {
-            if (rule.ForeignKey == null) return null;
-
             CsvColumn referenceColumn;
             if (rule.ForeignKey.ReferenceEnumType == typeof(TField))
             {
