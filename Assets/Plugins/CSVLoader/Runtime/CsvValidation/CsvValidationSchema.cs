@@ -101,10 +101,6 @@ namespace CSV4Unity.Validation
                         rule.MaxLength = maxLength.MaxLength;
                         hasConstraint = true;
                         break;
-                    case ForeignKeyAttribute foreignKey:
-                        rule.ForeignKey = foreignKey;
-                        hasConstraint = true;
-                        break;
                 }
             }
 
@@ -137,6 +133,5 @@ namespace CSV4Unity.Validation
         public HashSet<string> AllowedValues { get; set; }
         public int? MinLength { get; set; }
         public int? MaxLength { get; set; }
-        public ForeignKeyAttribute ForeignKey { get; set; }
     }
 }

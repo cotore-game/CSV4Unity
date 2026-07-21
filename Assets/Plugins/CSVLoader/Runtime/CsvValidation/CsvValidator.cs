@@ -18,19 +18,16 @@ namespace CSV4Unity.Validation
         /// <param name="validationSchema">
         /// 使用するValidationスキーマ。<see langword="null"/>の場合は<see cref="CsvValidationSchema{TField}.Default"/>を使用します。
         /// </param>
-        /// <param name="context">ForeignKeyの参照先テーブル。参照先が同じテーブルだけの場合は<see langword="null"/>にできます。</param>
         /// <param name="formatProvider">型変換と数値範囲検証に使用する形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
         /// <returns>すべてのエラーとWarningを格納したValidation結果。</returns>
         /// <exception cref="ArgumentNullException"><paramref name="table"/>が<see langword="null"/>です。</exception>
         /// <remarks>
         /// PrimaryKeyは空でなく一意、Uniqueは空セルを除いて一意であることを大文字小文字を区別して検証します。
-        /// ForeignKeyの参照テーブルまたは列を解決できない場合、その制約を実行せずWarningを追加します。
         /// 空セルはPrimaryKeyとNotNullを除くセル単位制約の対象外です。
         /// </remarks>
         public static CsvValidationResult Validate<TField>(
             CsvTable<TField> table,
             CsvValidationSchema<TField> validationSchema = null,
-            CsvValidationContext context = null,
             IFormatProvider formatProvider = null)
             where TField : struct, Enum
         {
@@ -43,7 +40,7 @@ namespace CSV4Unity.Validation
             IReadOnlyList<CsvFieldValidationRule<TField>> rules = schema.Rules;
             for (int i = 0; i < rules.Count; i++)
             {
-                ValidateField(table, rules[i], context, provider, result);
+                ValidateField(table, rules[i], provider, result);
             }
 
             return result;
@@ -52,7 +49,6 @@ namespace CSV4Unity.Validation
         private static void ValidateField<TField>(
             CsvTable<TField> table,
             CsvFieldValidationRule<TField> rule,
-            CsvValidationContext context,
             IFormatProvider formatProvider,
             CsvValidationResult result)
             where TField : struct, Enum
@@ -69,8 +65,6 @@ namespace CSV4Unity.Validation
                 ValidateDistinct(column, rule.FieldName, false, result);
             }
 
-            HashSet<string> referenceValues = PrepareForeignKeyValues(table, rule, context, result);
-
             for (int rowIndex = 0; rowIndex < column.Count; rowIndex++)
             {
                 CsvCell cell = column[rowIndex];
@@ -82,7 +76,7 @@ namespace CSV4Unity.Validation
 
                 if (cell.IsEmpty) continue;
 
-                ValidateCell(cell, rowIndex, rule, formatProvider, referenceValues, result);
+                ValidateCell(cell, rowIndex, rule, formatProvider, result);
             }
         }
 
@@ -91,7 +85,6 @@ namespace CSV4Unity.Validation
             int rowIndex,
             CsvFieldValidationRule<TField> rule,
             IFormatProvider formatProvider,
-            HashSet<string> referenceValues,
             CsvValidationResult result)
             where TField : struct, Enum
         {
@@ -122,8 +115,7 @@ namespace CSV4Unity.Validation
             }
 
             bool requiresString = rule.Pattern != null || rule.AllowedValues != null ||
-                                  rule.MinLength.HasValue || rule.MaxLength.HasValue ||
-                                  referenceValues != null;
+                                  rule.MinLength.HasValue || rule.MaxLength.HasValue;
             if (!requiresString) return;
 
             string text = cell.GetString();
@@ -151,11 +143,6 @@ namespace CSV4Unity.Validation
                     rowIndex,
                     rule.FieldName,
                     $"Length {text.Length} exceeds the maximum {rule.MaxLength.Value}.");
-            }
-
-            if (referenceValues != null && !referenceValues.Contains(text))
-            {
-                result.AddError(rowIndex, rule.FieldName, $"Referenced value '{text}' was not found.");
             }
         }
 
@@ -188,47 +175,6 @@ namespace CSV4Unity.Validation
                     result.AddError(rowIndex, fieldName, $"Duplicate {constraint} value: '{value}'.");
                 }
             }
-        }
-
-        private static HashSet<string> PrepareForeignKeyValues<TField>(
-            CsvTable<TField> table,
-            CsvFieldValidationRule<TField> rule,
-            CsvValidationContext context,
-            CsvValidationResult result)
-            where TField : struct, Enum
-        {
-            if (rule.ForeignKey == null) return null;
-
-            CsvColumn referenceColumn;
-            if (rule.ForeignKey.ReferenceEnumType == typeof(TField))
-            {
-                try
-                {
-                    referenceColumn = table.Document.Column(rule.ForeignKey.ReferenceField);
-                }
-                catch (KeyNotFoundException)
-                {
-                    result.AddWarning(-1, rule.FieldName, "Foreign key reference column was not found.");
-                    return null;
-                }
-            }
-            else if (context == null || !context.TryGetColumn(
-                         rule.ForeignKey.ReferenceEnumType,
-                         rule.ForeignKey.ReferenceField,
-                         out referenceColumn))
-            {
-                result.AddWarning(-1, rule.FieldName, "Foreign key reference table is not registered.");
-                return null;
-            }
-
-            var values = new HashSet<string>(StringComparer.Ordinal);
-            for (int rowIndex = 0; rowIndex < referenceColumn.Count; rowIndex++)
-            {
-                CsvCell cell = referenceColumn[rowIndex];
-                if (!cell.IsEmpty) values.Add(cell.GetString());
-            }
-
-            return values;
         }
     }
 }
