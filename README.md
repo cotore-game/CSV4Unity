@@ -194,6 +194,54 @@ foreach (ValidationError error in result.Errors)
 
 利用可能な制約は `PrimaryKey`、`NotNull`、`Unique`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、`MinLength`、`MaxLength`、`ForeignKey` です。
 
+### 条件付きValidation
+
+`Condition`を付けると、条件が成立した行だけValidation属性を適用できます。同じグループの条件はすべてANDとして評価されます。
+
+```csharp
+public enum ScenarioField
+{
+    Command,
+    Enabled,
+
+    [Condition(1, ScenarioField.Command, Compare.Equal, "Wait")]
+    [Condition(1, ScenarioField.Enabled, Compare.Equal, true)]
+    [NotNull(ConditionGroup = 1)]
+    [TypeConstraint(typeof(int), ConditionGroup = 1)]
+
+    [Condition(2, ScenarioField.Command, Compare.Equal, "SetFlag")]
+    [NotNull(ConditionGroup = 2)]
+    [TypeConstraint(typeof(bool), ConditionGroup = 2)]
+    Arg1
+}
+```
+
+グループを省略した場合はグループ0になります。単一条件なら番号を記述する必要はありません。
+
+```csharp
+[Condition(ScenarioField.Command, Compare.In, "Text", "Choice")]
+[NotNull]
+Text
+```
+
+`Compare`は `Equal`、`NotEqual`、`GreaterThan`、`GreaterThanOrEqual`、`LessThan`、`LessThanOrEqual`、`IsEmpty`、`IsNotEmpty`、`In`、`NotIn` を使用できます。文字列比較は既定で大文字小文字を区別し、`IgnoreCase = true`で無視できます。数値比較では数値リテラルを渡してください。
+
+```csharp
+[Condition(ScenarioField.Duration, Compare.GreaterThan, 0)]
+[Range(0, 10)]
+Arg1
+```
+
+比較値に同じEnum型のフィールドを指定すると、同じ行の列同士を比較します。
+
+```csharp
+[Condition(ScenarioField.Start, Compare.LessThanOrEqual, ScenarioField.End)]
+[NotNull]
+Text
+```
+
+Conditionは上から順に実行される`if / else`ではありません。各グループは独立して評価されるため、条件が重なると複数のValidationが同時に適用されます。else相当は`NotIn`や`NotEqual`で明示してください。
+
 ## Inspector Validation
 
 1. `CSV4Unity.Fields` 名前空間へValidation用Enumを定義します。

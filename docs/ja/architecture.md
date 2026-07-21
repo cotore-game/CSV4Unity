@@ -187,6 +187,7 @@ if (index.TryFindFirst("Text", out int rowIndex))
 | 型 | 役割 |
 |---|---|
 | `CsvValidationSchema<TField>` | Enum属性を一度読み取り、検証規則へ変換する |
+| `CsvConditionEvaluator` | コンパイル済みConditionを行ごとに評価する内部クラス |
 | `CsvValidator` | `CsvTable<TField>` を規則に従って検証する |
 | `CsvValidationContext` | 外部キー検証で参照先CSVを登録する |
 | `CsvValidationResult` | エラーと警告を保持する |
@@ -199,7 +200,11 @@ Validationは次の3種類へ分けます。
 | 列全体 | `PrimaryKey`、`Unique` |
 | CSV間 | `ForeignKey` |
 
-`PrimaryKey` と `Unique` は、各行の検証中に列全体を繰り返し走査せず、列ごとに一度だけ検証します。
+`ConditionAttribute`は対象フィールドに付いたValidation属性の適用行を限定します。スキーマ生成時に条件列をEnumへ解決し、Reflectionは行評価中に実行しません。同じ`ConditionGroup`の条件はANDで評価され、Validation属性は同じ番号の条件グループだけを参照します。グループ0にConditionがなければ、従来どおり無条件で適用します。
+
+Validation属性は属性1個につき内部規則1個へ変換します。このため、同じ列へCommand別の`TypeConstraint`を複数定義できます。条件は制約を実行するかだけを決め、条件不成立自体をValidationエラーにはしません。
+
+`PrimaryKey` と `Unique` は条件に一致する行集合を一度だけ走査します。無条件の場合も、各行のセル検証中に列全体を繰り返し走査しません。
 
 ## 依存関係のルール
 
