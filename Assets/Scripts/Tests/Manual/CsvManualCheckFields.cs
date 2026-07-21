@@ -44,4 +44,26 @@ namespace CSV4Unity.Fields
         [CSV4Unity.Validation.Range(1, 10)]
         Level
     }
+
+    /// <summary>
+    /// ConditionalValidation.csvのCommand別Validationに使用する手動確認用スキーマです。
+    /// </summary>
+    public enum ConditionalValidationFields
+    {
+        Command,
+        Enabled,
+
+        [Condition(1, ConditionalValidationFields.Command, Compare.Equal, "A")]
+        [Condition(1, ConditionalValidationFields.Enabled, Compare.Equal, true)]
+        [NotNull(ConditionGroup = 1)]
+        [TypeConstraint(typeof(int), ConditionGroup = 1)]
+
+        [Condition(2, ConditionalValidationFields.Command, Compare.Equal, "B")]
+        [NotNull(ConditionGroup = 2)]
+        [TypeConstraint(typeof(bool), ConditionGroup = 2)]
+
+        [Condition(3, ConditionalValidationFields.Command, Compare.NotIn, "A", "B")]
+        [AllowedValues("fallback", ConditionGroup = 3)]
+        Arg
+    }
 }
