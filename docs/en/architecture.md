@@ -121,12 +121,11 @@ Responsibility: adapt Unity inputs to the pure C# core.
 - Delegates all parsing to `CsvParser`.
 - Does not contain parsing, conversion, indexing, or validation algorithms.
 
-## Planned validation boundary
+## Validation boundary
 
 Attribute metadata will be compiled into a validation schema once, then applied to `CsvTable<TField>`. Row-local rules and column/table rules must be separate:
 
 - Row-local: required, type, range, regex, allowed values, length.
 - Column/table: primary key and unique.
-- Cross-document: foreign key through an explicit validation context.
 
 This prevents `Unique` from rescanning an entire column once per row and prevents the core data model from depending on reflection or validation attributes.

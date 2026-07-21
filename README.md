@@ -192,7 +192,7 @@ foreach (ValidationError error in result.Errors)
 }
 ```
 
-利用可能な制約は `PrimaryKey`、`NotNull`、`Unique`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、`MinLength`、`MaxLength`、`ForeignKey` です。
+利用可能な制約は `PrimaryKey`、`NotNull`、`Unique`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、`MinLength`、`MaxLength` です。
 
 ## Inspector Validation
 

@@ -188,16 +188,14 @@ if (index.TryFindFirst("Text", out int rowIndex))
 |---|---|
 | `CsvValidationSchema<TField>` | Enum属性を一度読み取り、検証規則へ変換する |
 | `CsvValidator` | `CsvTable<TField>` を規則に従って検証する |
-| `CsvValidationContext` | 外部キー検証で参照先CSVを登録する |
 | `CsvValidationResult` | エラーと警告を保持する |
 
-Validationは次の3種類へ分けます。
+Validationは次の2種類へ分けます。
 
 | 種類 | 制約 |
 |---|---|
 | セル・行単位 | `NotNull`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、文字列長 |
 | 列全体 | `PrimaryKey`、`Unique` |
-| CSV間 | `ForeignKey` |
 
 `PrimaryKey` と `Unique` は、各行の検証中に列全体を繰り返し走査せず、列ごとに一度だけ検証します。
 
