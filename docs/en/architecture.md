@@ -84,6 +84,7 @@ Responsibility: bind enum fields to document column indices once.
 - Reflects enum declarations only when a schema is bound.
 - Validates required headers and rejects ambiguous enum aliases.
 - Owns only the enum-to-column dictionary, never cell data.
+- `CsvSchemaAttribute` registers an enum for discovery by the Unity CSV Inspector. It is not required by runtime enum access APIs.
 - Can be inspected independently from row access and reused by validators.
 
 ### `CsvTable<TField>`
