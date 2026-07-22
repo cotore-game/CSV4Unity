@@ -1,4 +1,3 @@
-using CSV4Unity.Fields;
 using UnityEngine;
 
 namespace CSV4Unity.Examples
@@ -12,10 +11,6 @@ namespace CSV4Unity.Examples
         [SerializeField]
         [Tooltip("Assets/TestData/CSV4Unity/Scenario.csv を指定してください")]
         private TextAsset scenarioCsv;
-
-        [SerializeField]
-        [Tooltip("Assets/TestData/CSV4Unity/HugeData.csv を指定してください。未設定でも他の例は動作します")]
-        private TextAsset hugeDataCsv;
 
         private void Start()
         {
@@ -39,7 +34,6 @@ namespace CSV4Unity.Examples
             LogHeaderNameAccess();
             LogHeaderlessAccess();
             LogRfc4180Access();
-            LogLargeCsvAccess();
         }
 
         private static void LogEnumRowAccess(CsvTable<ScenarioFields> table)
@@ -119,15 +113,6 @@ namespace CSV4Unity.Examples
                 .Replace("\n", "\\n");
 
             Debug.Log($"[RFC 4180] Text={multiline}, Note={document.Cell(0, "Note").GetString()}");
-        }
-
-        private void LogLargeCsvAccess()
-        {
-            if (hugeDataCsv == null) return;
-
-            CsvTable<HugeDataFields> table = CSVLoader.LoadTable<HugeDataFields>(hugeDataCsv);
-            CsvColumn<HugeDataFields> firstColumn = table.Column(HugeDataFields.a);
-            Debug.Log($"[Large CSV] Rows={table.RowCount}, Columns={table.ColumnCount}, Column a={firstColumn.Count}");
         }
     }
 }
