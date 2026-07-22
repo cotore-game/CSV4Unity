@@ -344,5 +344,11 @@ namespace CSV4Unity.Tests
             Assert.Throws<CsvSchemaException>(() => CsvValidationSchema<InvalidCompareField>.Create());
         }
 
+        [Test]
+        public void DefaultSchema_UnknownComparison_ThrowsSchemaException()
+        {
+            Assert.Throws<CsvSchemaException>(() =>
+                Assert.That(CsvValidationSchema<InvalidCompareField>.Default, Is.Not.Null));
+        }
     }
 }

@@ -64,6 +64,16 @@ namespace CSV4Unity.Editor
             EditorGUILayout.Space(10);
             DrawSeparator();
             EditorGUILayout.Space(5);
+
+            EditorGUILayout.LabelField("CSV Viewer", EditorStyles.boldLabel);
+            if (GUILayout.Button("Open CSV Viewer", GUILayout.Height(26)))
+            {
+                CsvViewerWindow.Open(_csvFile);
+            }
+
+            EditorGUILayout.Space(10);
+            DrawSeparator();
+            EditorGUILayout.Space(5);
             EditorGUILayout.LabelField("CSV Validation", EditorStyles.boldLabel);
 
             if (_availableEnums.Count == 0)

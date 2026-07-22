@@ -13,6 +13,9 @@ namespace CSV4Unity.Validation
     /// <remarks>生成後の規則は変更されず、複数の<see cref="CsvTable{TField}"/>のValidationに再利用できます。</remarks>
     public sealed class CsvValidationSchema<TField> where TField : struct, Enum
     {
+        private static readonly Lazy<CsvValidationSchema<TField>> DefaultSchema =
+            new Lazy<CsvValidationSchema<TField>>(Create);
+
         private readonly CsvFieldValidationRule<TField>[] _rules;
 
         private CsvValidationSchema(CsvFieldValidationRule<TField>[] rules)
@@ -21,7 +24,7 @@ namespace CSV4Unity.Validation
         }
 
         /// <summary>Enum型ごとに一度生成される既定スキーマを取得します。</summary>
-        public static CsvValidationSchema<TField> Default { get; } = Create();
+        public static CsvValidationSchema<TField> Default => DefaultSchema.Value;
 
         /// <summary>Enumに定義されたValidation属性の総数を取得します。</summary>
         public int RuleCount => _rules.Length;
