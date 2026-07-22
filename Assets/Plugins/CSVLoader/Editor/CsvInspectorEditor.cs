@@ -12,12 +12,32 @@ using UnityEngine;
 namespace CSV4Unity.Editor
 {
     /// <summary>
-    /// CSVのTextAssetに、Enumスキーマを使った検証UIを追加します。
+    /// CSVのTextAssetに、文字コード変換、Viewer、ValidationのUIを追加します。
     /// </summary>
     [CustomEditor(typeof(TextAsset))]
     public sealed class CsvInspectorEditor : UnityEditor.Editor
     {
         private const string FieldsNamespace = "CSV4Unity.Fields";
+        private static readonly CsvSourceEncoding[] SourceEncodingValues =
+        {
+            CsvSourceEncoding.Auto,
+            CsvSourceEncoding.Utf8,
+            CsvSourceEncoding.ShiftJis,
+            CsvSourceEncoding.Utf16LittleEndian,
+            CsvSourceEncoding.Utf16BigEndian,
+            CsvSourceEncoding.Utf32LittleEndian,
+            CsvSourceEncoding.Utf32BigEndian
+        };
+        private static readonly string[] SourceEncodingLabels =
+        {
+            "Auto Detect",
+            "UTF-8",
+            "Shift_JIS (CP932)",
+            "UTF-16 LE",
+            "UTF-16 BE",
+            "UTF-32 LE",
+            "UTF-32 BE"
+        };
         private static readonly MethodInfo ValidateDocumentMethod = typeof(CsvInspectorEditor)
             .GetMethod(nameof(ValidateDocument), BindingFlags.NonPublic | BindingFlags.Static);
 
@@ -28,17 +48,24 @@ namespace CSV4Unity.Editor
         private CsvValidationResult _validationResult;
         private Vector2 _scrollPosition;
         private bool _showValidationResults;
+        private bool _showEncodingPreview;
+        private bool _overrideEncodingDetection;
         private bool _isCsv;
+        private string _assetPath;
+        private CsvSourceEncoding _sourceEncoding;
+        private CsvEncodingInspection _automaticEncodingInspection;
+        private CsvEncodingInspection _encodingInspection;
 
         private void OnEnable()
         {
             _csvFile = target as TextAsset;
-            string assetPath = AssetDatabase.GetAssetPath(_csvFile);
-            _isCsv = string.Equals(Path.GetExtension(assetPath), ".csv", StringComparison.OrdinalIgnoreCase);
+            _assetPath = AssetDatabase.GetAssetPath(_csvFile);
+            _isCsv = string.Equals(Path.GetExtension(_assetPath), ".csv", StringComparison.OrdinalIgnoreCase);
             if (!_isCsv) return;
 
+            RefreshEncodingInspection();
             RefreshEnums();
-            RestoreSelection(assetPath);
+            RestoreSelection(_assetPath);
         }
 
         public override void OnInspectorGUI()
@@ -51,7 +78,7 @@ namespace CSV4Unity.Editor
             GUI.enabled = true;
             try
             {
-                DrawCsvValidationControls();
+                DrawCsvControls();
             }
             finally
             {
@@ -59,12 +86,24 @@ namespace CSV4Unity.Editor
             }
         }
 
-        private void DrawCsvValidationControls()
+        private void DrawCsvControls()
         {
             EditorGUILayout.Space(10);
             DrawSeparator();
             EditorGUILayout.Space(5);
 
+            DrawEncodingControls();
+            if (!IsUtf8Ready())
+            {
+                EditorGUILayout.HelpBox(
+                    "CSV ViewerとValidationを使用する前に、CSVをUTF-8へ変換してください。",
+                    MessageType.Warning);
+                return;
+            }
+
+            EditorGUILayout.Space(10);
+            DrawSeparator();
+            EditorGUILayout.Space(5);
             EditorGUILayout.LabelField("CSV Viewer", EditorStyles.boldLabel);
             if (GUILayout.Button("Open CSV Viewer", GUILayout.Height(26)))
             {
@@ -105,6 +144,263 @@ namespace CSV4Unity.Editor
                 EditorGUILayout.Space(10);
                 DrawValidationResults();
             }
+        }
+
+        private void DrawEncodingControls()
+        {
+            EditorGUILayout.LabelField("CSV Encoding", EditorStyles.boldLabel);
+
+            if (!_automaticEncodingInspection.IsValid)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Encoding could not be detected. {_automaticEncodingInspection.ErrorMessage}",
+                    MessageType.Error);
+            }
+            else if (_automaticEncodingInspection.RequiresConversion)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Detected {_automaticEncodingInspection.DisplayName}. Convert this file to UTF-8 before using it.",
+                    MessageType.Warning);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    $"Encoding: {_automaticEncodingInspection.DisplayName}",
+                    MessageType.Info);
+            }
+
+            bool overrideDetection = EditorGUILayout.ToggleLeft(
+                "Override automatic detection",
+                _overrideEncodingDetection);
+            if (overrideDetection != _overrideEncodingDetection)
+            {
+                _overrideEncodingDetection = overrideDetection;
+                if (_overrideEncodingDetection)
+                {
+                    InspectUsingSelectedEncoding();
+                    _showEncodingPreview = true;
+                }
+                else
+                {
+                    _encodingInspection = _automaticEncodingInspection;
+                }
+            }
+
+            if (_overrideEncodingDetection)
+            {
+                int selectedIndex = Array.IndexOf(SourceEncodingValues, _sourceEncoding);
+                int nextIndex = EditorGUILayout.Popup(
+                    "Source Encoding",
+                    Math.Max(selectedIndex, 0),
+                    SourceEncodingLabels);
+                CsvSourceEncoding selectedEncoding = SourceEncodingValues[nextIndex];
+                if (selectedEncoding != _sourceEncoding)
+                {
+                    _sourceEncoding = selectedEncoding;
+                    InspectUsingSelectedEncoding();
+                    _showEncodingPreview = true;
+                }
+
+                if (IsOverrideDifferentFromDetection())
+                {
+                    EditorGUILayout.HelpBox(
+                        $"Selected {_encodingInspection.DisplayName}, but automatic detection found " +
+                        $"{_automaticEncodingInspection.DisplayName}. Check the preview carefully before converting.",
+                        MessageType.Error);
+                }
+
+                if (!_encodingInspection.IsValid)
+                {
+                    EditorGUILayout.HelpBox(_encodingInspection.ErrorMessage, MessageType.Error);
+                }
+            }
+
+            if (_encodingInspection.IsValid)
+            {
+                _showEncodingPreview = EditorGUILayout.Foldout(
+                    _showEncodingPreview,
+                    "Decoded Preview",
+                    true);
+                if (_showEncodingPreview)
+                {
+                    EditorGUILayout.SelectableLabel(
+                        CreatePreview(_encodingInspection.Text),
+                        EditorStyles.textArea,
+                        GUILayout.MinHeight(80),
+                        GUILayout.MaxHeight(160));
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(!_encodingInspection.RequiresConversion))
+            {
+                if (GUILayout.Button(
+                        $"Convert {_encodingInspection.DisplayName} to UTF-8",
+                        GUILayout.Height(26)))
+                {
+                    ConvertAssetToUtf8();
+                }
+            }
+
+            DrawEncodingBackupControls();
+        }
+
+        private void RefreshEncodingInspection()
+        {
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(GetAbsoluteAssetPath());
+                _automaticEncodingInspection = CsvEncodingUtility.Inspect(bytes);
+                _encodingInspection = _automaticEncodingInspection;
+                _sourceEncoding = _automaticEncodingInspection.IsValid
+                    ? _automaticEncodingInspection.Encoding
+                    : CsvSourceEncoding.Auto;
+                _overrideEncodingDetection = !_automaticEncodingInspection.IsValid;
+                _showEncodingPreview = _encodingInspection.RequiresConversion;
+            }
+            catch (Exception exception)
+            {
+                _automaticEncodingInspection = new CsvEncodingInspection(
+                    CsvSourceEncoding.Auto,
+                    false,
+                    false,
+                    null,
+                    exception.Message);
+                _encodingInspection = _automaticEncodingInspection;
+                _sourceEncoding = CsvSourceEncoding.Auto;
+                _overrideEncodingDetection = true;
+            }
+        }
+
+        private void InspectUsingSelectedEncoding()
+        {
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(GetAbsoluteAssetPath());
+                _encodingInspection = CsvEncodingUtility.Decode(bytes, _sourceEncoding);
+            }
+            catch (Exception exception)
+            {
+                _encodingInspection = new CsvEncodingInspection(
+                    _sourceEncoding,
+                    false,
+                    false,
+                    null,
+                    exception.Message);
+            }
+        }
+
+        private void ConvertAssetToUtf8()
+        {
+            if (!_encodingInspection.RequiresConversion) return;
+
+            bool confirmed = EditorUtility.DisplayDialog(
+                "Convert CSV to UTF-8",
+                $"{_csvFile.name}.csv を {_encodingInspection.DisplayName} からUTF-8へ変換します。\n" +
+                "ファイル内容が更新され、Gitの変更対象になります。" +
+                (IsOverrideDifferentFromDetection()
+                    ? $"\n\n警告: 自動判定は {_automaticEncodingInspection.DisplayName} です。"
+                    : string.Empty),
+                "Convert",
+                "Cancel");
+            if (!confirmed) return;
+
+            try
+            {
+                string absolutePath = GetAbsoluteAssetPath();
+                byte[] source = File.ReadAllBytes(absolutePath);
+                CsvSourceEncoding sourceEncoding = _overrideEncodingDetection
+                    ? _sourceEncoding
+                    : CsvSourceEncoding.Auto;
+                byte[] utf8 = CsvEncodingUtility.ConvertToUtf8(source, sourceEncoding);
+                CsvEncodingBackupUtility.CreateIfMissing(GetBackupPath(), source);
+                CsvEncodingBackupUtility.WriteAtomically(absolutePath, utf8);
+                AssetDatabase.ImportAsset(_assetPath, ImportAssetOptions.ForceUpdate);
+                _csvFile = AssetDatabase.LoadAssetAtPath<TextAsset>(_assetPath);
+                RefreshEncodingInspection();
+                _validationResult = null;
+                _showValidationResults = false;
+                Debug.Log($"CSV4Unity: Converted '{_assetPath}' to UTF-8.", _csvFile);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"CSV4Unity: Failed to convert '{_assetPath}' to UTF-8. {exception}", _csvFile);
+                EditorUtility.DisplayDialog("CSV Conversion Failed", exception.Message, "OK");
+                RefreshEncodingInspection();
+            }
+        }
+
+        private void DrawEncodingBackupControls()
+        {
+            if (!File.Exists(GetBackupPath())) return;
+
+            EditorGUILayout.HelpBox(
+                "The original bytes from before the first conversion are available as a backup.",
+                MessageType.Info);
+            if (GUILayout.Button("Restore Pre-conversion File")) RestoreEncodingBackup();
+        }
+
+        private void RestoreEncodingBackup()
+        {
+            bool confirmed = EditorUtility.DisplayDialog(
+                "Restore CSV Before Conversion",
+                $"{_csvFile.name}.csv を最初の文字コード変換前の状態へ戻します。",
+                "Restore",
+                "Cancel");
+            if (!confirmed) return;
+
+            try
+            {
+                CsvEncodingBackupUtility.Restore(GetBackupPath(), GetAbsoluteAssetPath());
+                AssetDatabase.ImportAsset(_assetPath, ImportAssetOptions.ForceUpdate);
+                _csvFile = AssetDatabase.LoadAssetAtPath<TextAsset>(_assetPath);
+                RefreshEncodingInspection();
+                _validationResult = null;
+                _showValidationResults = false;
+                Debug.Log($"CSV4Unity: Restored the pre-conversion file for '{_assetPath}'.", _csvFile);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"CSV4Unity: Failed to restore '{_assetPath}'. {exception}", _csvFile);
+                EditorUtility.DisplayDialog("CSV Restore Failed", exception.Message, "OK");
+            }
+        }
+
+        private bool IsOverrideDifferentFromDetection()
+        {
+            return _overrideEncodingDetection &&
+                   _automaticEncodingInspection.IsValid &&
+                   _sourceEncoding != CsvSourceEncoding.Auto &&
+                   _sourceEncoding != _automaticEncodingInspection.Encoding;
+        }
+
+        private bool IsUtf8Ready()
+        {
+            return _encodingInspection.IsValid &&
+                   _encodingInspection.Encoding == CsvSourceEncoding.Utf8;
+        }
+
+        private string GetAbsoluteAssetPath()
+        {
+            return Path.GetFullPath(_assetPath);
+        }
+
+        private string GetBackupPath()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+            string assetGuid = AssetDatabase.AssetPathToGUID(_assetPath);
+            return Path.Combine(
+                projectRoot ?? Path.GetFullPath("."),
+                "Library",
+                "CSV4Unity",
+                "EncodingBackups",
+                assetGuid + ".bytes");
+        }
+
+        private static string CreatePreview(string text)
+        {
+            const int maxLength = 2000;
+            if (string.IsNullOrEmpty(text) || text.Length <= maxLength) return text ?? string.Empty;
+            return text.Substring(0, maxLength) + "\n...";
         }
 
         private void DrawSchemaSelector()

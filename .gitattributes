@@ -30,5 +30,11 @@
 *.sh text eol=lf
 *.ps1 text eol=lf
 
+# Preserve the original bytes of encoding detection fixtures
+Assets/TestData/CSV4Unity/EncodingDetection/EncodingShiftJis.csv binary
+Assets/TestData/CSV4Unity/EncodingDetection/EncodingUtf16*.csv binary
+Assets/TestData/CSV4Unity/EncodingDetection/EncodingUtf32*.csv binary
+Assets/TestData/CSV4Unity/EncodingDetection/EncodingInvalid.csv binary
+
 # Exclude TextMesh Pro files from language statistics
 "Assets/TextMesh Pro/**" linguist-generated=true linguist-vendored=true
