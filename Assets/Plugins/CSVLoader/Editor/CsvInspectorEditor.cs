@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -121,30 +122,147 @@ namespace CSV4Unity.Editor
         {
             EditorGUILayout.Space(5);
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField($"Constraints: {enumType.Name}", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Schema Preview: {enumType.Name}", EditorStyles.boldLabel);
+            EditorGUILayout.Space(3);
 
             bool hasConstraints = false;
             FieldInfo[] fields = enumType.GetFields(BindingFlags.Public | BindingFlags.Static);
             for (int i = 0; i < fields.Length; i++)
             {
                 object[] attributes = fields[i].GetCustomAttributes(false);
-                List<string> labels = attributes
-                    .OfType<Attribute>()
-                    .Select(GetAttributeDisplayText)
-                    .Where(label => label != null)
-                    .ToList();
+                ConditionAttribute[] conditions = attributes.OfType<ConditionAttribute>().ToArray();
+                CsvValidationAttribute[] validations = attributes.OfType<CsvValidationAttribute>().ToArray();
 
-                if (labels.Count == 0) continue;
+                if (conditions.Length == 0 && validations.Length == 0) continue;
+                if (hasConstraints)
+                {
+                    EditorGUILayout.Space(5);
+                    DrawSeparator();
+                    EditorGUILayout.Space(5);
+                }
+
                 hasConstraints = true;
-                EditorGUILayout.LabelField(fields[i].Name, string.Join(", ", labels));
+                DrawFieldConstraints(fields[i].Name, conditions, validations);
             }
 
             if (!hasConstraints)
             {
-                EditorGUILayout.LabelField("制約属性は定義されていません。", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("No validation constraints are defined.", EditorStyles.miniLabel);
             }
 
             EditorGUILayout.EndVertical();
+        }
+
+        private static void DrawFieldConstraints(
+            string fieldName,
+            IReadOnlyList<ConditionAttribute> conditions,
+            IReadOnlyList<CsvValidationAttribute> validations)
+        {
+            EditorGUILayout.LabelField(fieldName, EditorStyles.boldLabel);
+
+            int[] groups = conditions
+                .Select(condition => condition.Group)
+                .Concat(validations.Select(validation => validation.ConditionGroup))
+                .Distinct()
+                .OrderBy(group => group)
+                .ToArray();
+
+            GUIStyle expressionStyle = new GUIStyle(EditorStyles.wordWrappedLabel)
+            {
+                padding = new RectOffset(8, 4, 1, 1)
+            };
+
+            for (int i = 0; i < groups.Length; i++)
+            {
+                int group = groups[i];
+                ConditionAttribute[] groupConditions = conditions
+                    .Where(condition => condition.Group == group)
+                    .ToArray();
+                CsvValidationAttribute[] groupValidations = validations
+                    .Where(validation => validation.ConditionGroup == group)
+                    .ToArray();
+
+                if (i > 0) EditorGUILayout.Space(4);
+
+                string conditionExpression = groupConditions.Length == 0
+                    ? group == 0 ? "ALWAYS" : $"IF (GROUP {group} HAS NO CONDITION)"
+                    : $"IF ({string.Join(" && ", groupConditions.Select(FormatCondition))})";
+                EditorGUILayout.LabelField(conditionExpression, expressionStyle);
+
+                string validationExpression = groupValidations.Length == 0
+                    ? "NO CONSTRAINT"
+                    : string.Join(" && ", groupValidations.Select(GetValidationDisplayText));
+                EditorGUILayout.LabelField(
+                    $"=> {fieldName}: {validationExpression}",
+                    expressionStyle);
+            }
+        }
+
+        private static string FormatCondition(ConditionAttribute condition)
+        {
+            string field = condition.Field?.ToString() ?? "null";
+            string suffix = condition.IgnoreCase ? " [IGNORE CASE]" : string.Empty;
+
+            switch (condition.Comparison)
+            {
+                case Compare.Equal:
+                    return $"{field} == {FormatSingleValue(condition)}{suffix}";
+                case Compare.NotEqual:
+                    return $"{field} != {FormatSingleValue(condition)}{suffix}";
+                case Compare.GreaterThan:
+                    return $"{field} > {FormatSingleValue(condition)}";
+                case Compare.GreaterThanOrEqual:
+                    return $"{field} >= {FormatSingleValue(condition)}";
+                case Compare.LessThan:
+                    return $"{field} < {FormatSingleValue(condition)}";
+                case Compare.LessThanOrEqual:
+                    return $"{field} <= {FormatSingleValue(condition)}";
+                case Compare.IsEmpty:
+                    return $"{field} IS EMPTY";
+                case Compare.IsNotEmpty:
+                    return $"{field} IS NOT EMPTY";
+                case Compare.In:
+                    return $"{field} IN ({string.Join(", ", condition.Values.Select(FormatValue))}){suffix}";
+                case Compare.NotIn:
+                    return $"{field} NOT IN ({string.Join(", ", condition.Values.Select(FormatValue))}){suffix}";
+                default:
+                    return $"{field} {condition.Comparison}";
+            }
+        }
+
+        private static string FormatSingleValue(ConditionAttribute condition)
+        {
+            return condition.Values.Length == 0 ? "<?>" : FormatValue(condition.Values[0]);
+        }
+
+        private static string FormatValue(object value)
+        {
+            switch (value)
+            {
+                case null:
+                    return "null";
+                case string text:
+                    return $"\"{EscapeValue(text)}\"";
+                case char character:
+                    return $"'{EscapeValue(character.ToString())}'";
+                case bool boolean:
+                    return boolean ? "true" : "false";
+                case Enum enumValue:
+                    return enumValue.ToString();
+                case IFormattable formattable:
+                    return formattable.ToString(null, CultureInfo.InvariantCulture);
+                default:
+                    return value.ToString();
+            }
+        }
+
+        private static string EscapeValue(string value)
+        {
+            return value
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n");
         }
 
         private void ExecuteValidation()
@@ -292,30 +410,30 @@ namespace CSV4Unity.Editor
             return $"CSV4Unity.SelectedEnum.{AssetDatabase.AssetPathToGUID(assetPath)}";
         }
 
-        private static string GetAttributeDisplayText(Attribute attribute)
+        private static string GetValidationDisplayText(CsvValidationAttribute attribute)
         {
             switch (attribute)
             {
                 case PrimaryKeyAttribute:
-                    return "[PrimaryKey]";
+                    return "PRIMARY KEY";
                 case NotNullAttribute:
-                    return "[NotNull]";
+                    return "VALUE IS NOT EMPTY";
                 case UniqueAttribute:
-                    return "[Unique]";
+                    return "UNIQUE";
                 case TypeConstraintAttribute typeConstraint:
-                    return $"[Type: {typeConstraint.ExpectedType.Name}]";
+                    return $"TYPE = {typeConstraint.ExpectedType.Name}";
                 case Validation.RangeAttribute range:
-                    return $"[Range: {range.Min}-{range.Max}]";
+                    return $"{FormatValue(range.Min)} <= VALUE <= {FormatValue(range.Max)}";
                 case RegexAttribute regex:
-                    return $"[Regex: {regex.Pattern}]";
+                    return $"MATCHES {FormatValue(regex.Pattern)}";
                 case AllowedValuesAttribute allowed:
-                    return $"[Allowed: {string.Join("|", allowed.AllowedValues)}]";
+                    return $"VALUE IN ({string.Join(", ", allowed.AllowedValues.Select(FormatValue))})";
                 case MinLengthAttribute minLength:
-                    return $"[MinLength: {minLength.MinLength}]";
+                    return $"LENGTH >= {minLength.MinLength}";
                 case MaxLengthAttribute maxLength:
-                    return $"[MaxLength: {maxLength.MaxLength}]";
+                    return $"LENGTH <= {maxLength.MaxLength}";
                 default:
-                    return null;
+                    return attribute.GetType().Name;
             }
         }
 

@@ -30,7 +30,7 @@ Parsing                 Schema                 Conversion
                             |                         |
                         CsvIndex<TKey> <--------------+
 
-Validation (next stage)
+Validation
   depends on CsvTable<TField>, CsvEnumSchema<TField>, and CsvCell
   core data classes never depend on validation
 ```
@@ -123,9 +123,13 @@ Responsibility: adapt Unity inputs to the pure C# core.
 
 ## Validation boundary
 
-Attribute metadata will be compiled into a validation schema once, then applied to `CsvTable<TField>`. Row-local rules and column/table rules must be separate:
+`CsvValidationSchema<TField>` compiles attribute metadata once and `CsvValidator` applies the resulting rules to `CsvTable<TField>`. Row-local rules and column/table rules remain separate:
 
 - Row-local: required, type, range, regex, allowed values, length.
 - Column/table: primary key and unique.
 
-This prevents `Unique` from rescanning an entire column once per row and prevents the core data model from depending on reflection or validation attributes.
+`ConditionAttribute` limits a validation rule to matching rows. Conditions in the same `ConditionGroup` are combined with AND. Enum fields and groups are resolved while creating the validation schema, so row evaluation performs no reflection. Each validation attribute becomes one internal rule, allowing one CSV column to use different type constraints for different commands.
+
+The internal `CsvConditionEvaluator` owns condition comparison while `CsvValidator` remains responsible for applying validation constraints.
+
+This prevents `Unique` from rescanning an entire column once per row and keeps the core data model independent from reflection and validation attributes.

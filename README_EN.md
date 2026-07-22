@@ -71,6 +71,25 @@ CsvTable<CharacterField> table = CSVLoader.LoadTable<CharacterField>(csvAsset);
 CsvValidationResult result = CsvValidator.Validate(table);
 ```
 
+Use `Condition` to apply validation attributes only to matching rows. Conditions in the same group are combined with AND.
+
+```csharp
+public enum ScenarioField
+{
+    Command,
+
+    [Condition(1, ScenarioField.Command, Compare.Equal, "Wait")]
+    [NotNull(ConditionGroup = 1)]
+    [TypeConstraint(typeof(int), ConditionGroup = 1)]
+
+    [Condition(2, ScenarioField.Command, Compare.Equal, "SetFlag")]
+    [TypeConstraint(typeof(bool), ConditionGroup = 2)]
+    Arg1
+}
+```
+
+The default group is zero. Supported comparisons are `Equal`, `NotEqual`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`, `IsEmpty`, `IsNotEmpty`, `In`, and `NotIn`. Groups are declarative and have no `if / else` execution order.
+
 The Japanese README is the canonical user documentation while the API is being stabilized. See [the architecture document](./docs/en/architecture.md) for the current class boundaries.
 
 ## License
