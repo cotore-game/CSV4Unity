@@ -124,10 +124,10 @@ Responsibility: adapt Unity inputs to the pure C# core.
 
 ### Unity Editor tools
 
-- `CsvInspectorEditor` provides source-encoding inspection, explicit UTF-8 conversion, and the viewer and validation entry points.
+- `CsvInspectorEditor` delegates non-CSV assets to Unity's built-in TextAsset Inspector. For CSV assets it omits the redundant raw-text preview and adds encoding, viewer, and validation controls.
 - `CsvEncodingUtility` validates source bytes and converts a selected source encoding to UTF-8.
 - `CsvViewerWindow` owns asset selection, parsing, search state, and reload behavior.
-- `CsvViewerTable` draws only visible rows and provides column resizing and copy commands.
+- `CsvViewerTable` draws only visible rows and provides 75-200% zoom, column resizing, and copy commands.
 
 The viewer treats `CsvDocument` as read-only data. It caches display strings for at most 256 rows instead of duplicating the complete CSV as a two-dimensional string array. Editing and writing remain separate future responsibilities.
 

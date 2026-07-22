@@ -17,6 +17,7 @@ namespace CSV4Unity.Editor
     [CustomEditor(typeof(TextAsset))]
     public sealed class CsvInspectorEditor : UnityEditor.Editor
     {
+        private const string BuiltInTextAssetInspectorName = "UnityEditor.TextAssetInspector";
         private static readonly CsvSourceEncoding[] SourceEncodingValues =
         {
             CsvSourceEncoding.Auto,
@@ -54,12 +55,20 @@ namespace CSV4Unity.Editor
         private CsvSourceEncoding _sourceEncoding;
         private CsvEncodingInspection _automaticEncodingInspection;
         private CsvEncodingInspection _encodingInspection;
+        private UnityEditor.Editor _builtInInspector;
 
         private void OnEnable()
         {
+            // CustomEditorは拡張子で対象を絞れないため、基礎表示はUnity標準Inspectorへ委譲する。
+            Type builtInInspectorType = FindBuiltInTextAssetInspectorType();
+            if (builtInInspectorType != null)
+            {
+                _builtInInspector = CreateEditor(targets, builtInInspectorType);
+            }
+
             _csvFile = target as TextAsset;
             _assetPath = AssetDatabase.GetAssetPath(_csvFile);
-            _isCsv = string.Equals(Path.GetExtension(_assetPath), ".csv", StringComparison.OrdinalIgnoreCase);
+            _isCsv = CsvEditorAssetUtility.IsCsvPath(_assetPath);
             if (!_isCsv) return;
 
             RefreshEncodingInspection();
@@ -67,9 +76,29 @@ namespace CSV4Unity.Editor
             RestoreSelection(_assetPath);
         }
 
+        private void OnDisable()
+        {
+            if (_builtInInspector == null) return;
+            DestroyImmediate(_builtInInspector);
+            _builtInInspector = null;
+        }
+
         public override void OnInspectorGUI()
         {
-            DrawDefaultInspector();
+            if (_isCsv)
+            {
+                // CSV本文は専用Viewerで表示するため、標準TextAssetの長いテキストプレビューは描画しない。
+                DrawDefaultInspector();
+            }
+            else if (_builtInInspector != null)
+            {
+                _builtInInspector.OnInspectorGUI();
+            }
+            else
+            {
+                DrawDefaultInspector();
+            }
+
             if (!_isCsv || _csvFile == null) return;
 
             // TextAssetの標準Inspectorは読み取り専用なので、追加UIだけ操作可能にする。
@@ -83,6 +112,18 @@ namespace CSV4Unity.Editor
             {
                 GUI.enabled = previousEnabled;
             }
+        }
+
+        internal static Type FindBuiltInTextAssetInspectorType()
+        {
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < assemblies.Length; i++)
+            {
+                Type type = assemblies[i].GetType(BuiltInTextAssetInspectorName, false);
+                if (type != null && type != typeof(CsvInspectorEditor)) return type;
+            }
+
+            return null;
         }
 
         private void DrawCsvControls()
