@@ -1,0 +1,3 @@
+CSV4Unity non-CSV Inspector check.
+
+This file must use Unity's standard TextAsset Inspector without CSV controls.

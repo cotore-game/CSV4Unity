@@ -48,5 +48,18 @@ namespace CSV4Unity.Tests.EditMode
 
             Assert.That(table.FilteredRowCount, Is.EqualTo(3));
         }
+
+        [TestCase(0.1f, 0.75f)]
+        [TestCase(1.25f, 1.25f)]
+        [TestCase(3f, 2f)]
+        public void SetZoom_ClampsSupportedRange(float zoom, float expected)
+        {
+            CsvDocument document = CSVLoader.LoadDocument(Csv);
+            var table = new CsvViewerTable(document);
+
+            table.SetZoom(zoom);
+
+            Assert.That(table.Zoom, Is.EqualTo(expected));
+        }
     }
 }
