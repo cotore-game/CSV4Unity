@@ -23,6 +23,7 @@ CSV4Unity reads CSV text into row, column, and cell views for Unity. Values rema
 - Explicitly created search indices
 - Attribute-based validation
 - Unity Inspector validation
+- Read-only CSV Viewer
 
 ## Installation
 
@@ -89,6 +90,12 @@ public enum ScenarioField
 ```
 
 The default group is zero. Supported comparisons are `Equal`, `NotEqual`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`, `IsEmpty`, `IsNotEmpty`, `In`, and `NotIn`. Groups are declarative and have no `if / else` execution order.
+
+## CSV Viewer
+
+Select a CSV asset and click `Open CSV Viewer` in the Inspector. The viewer is also available from `Assets > Open in CSV Viewer` and `Window > CSV4Unity > CSV Viewer`.
+
+The read-only table supports headerless files, case-insensitive search, resizable columns, cell or row copying, and automatic reload after asset changes. It virtualizes row drawing and uses the same parser as the Runtime API.
 
 The Japanese README is the canonical user documentation while the API is being stabilized. See [the architecture document](./docs/en/architecture.md) for the current class boundaries.
 

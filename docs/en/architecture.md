@@ -121,6 +121,14 @@ Responsibility: adapt Unity inputs to the pure C# core.
 - Delegates all parsing to `CsvParser`.
 - Does not contain parsing, conversion, indexing, or validation algorithms.
 
+### Unity Editor tools
+
+- `CsvInspectorEditor` adds the viewer and validation entry points to CSV assets.
+- `CsvViewerWindow` owns asset selection, parsing, search state, and reload behavior.
+- `CsvViewerTable` draws only visible rows and provides column resizing and copy commands.
+
+The viewer treats `CsvDocument` as read-only data. It caches display strings for at most 256 rows instead of duplicating the complete CSV as a two-dimensional string array. Editing and writing remain separate future responsibilities.
+
 ## Validation boundary
 
 `CsvValidationSchema<TField>` compiles attribute metadata once and `CsvValidator` applies the resulting rules to `CsvTable<TField>`. Row-local rules and column/table rules remain separate:

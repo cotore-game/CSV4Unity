@@ -147,6 +147,16 @@ public enum ItemField
 
 対応候補が0件または複数件の場合や、複数のEnumフィールドが同じCSV列へ対応した場合は、曖昧なスキーマとして `CsvSchemaException` を送出します。
 
+### Unity Editor
+
+| 型 | 役割 |
+|---|---|
+| `CsvInspectorEditor` | CSV InspectorへViewerとValidationの入口を追加する |
+| `CsvViewerWindow` | CSVアセットの選択、解析、検索条件、再読込を管理する |
+| `CsvViewerTable` | 表示範囲の行だけを描画し、列幅変更とコピー操作を提供する |
+
+ViewerはEditor専用であり、`CsvDocument`を読み取り専用データとして利用します。表示用文字列は最大256行分だけキャッシュし、CSV全体を表示専用の二次元文字列配列へ複製しません。編集や書き出しは別の責務とします。
+
 ### 型変換
 
 | 型 | 役割 |

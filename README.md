@@ -26,6 +26,7 @@ CSVをクラスへ一括変換せず、セルを必要なときに指定した�
 - 検索用インデックスの明示生成
 - Enum属性によるValidation
 - CSV Inspectorからの手動Validation
+- 読み取り専用CSV Viewer
 
 ## インストール
 
@@ -241,6 +242,18 @@ Text
 ```
 
 Conditionは上から順に実行される`if / else`ではありません。各グループは独立して評価されるため、条件が重なると複数のValidationが同時に適用されます。else相当は`NotIn`や`NotEqual`で明示してください。
+
+## CSV Viewer
+
+ProjectウィンドウでCSVを選択し、Inspectorの `Open CSV Viewer` を押すと、CSVを読み取り専用の表として確認できます。CSVを右クリックして `Open in CSV Viewer` を選ぶか、`Window > CSV4Unity > CSV Viewer` から開くこともできます。
+
+- `Header` で先頭行をヘッダーとして扱うか切り替え
+- 検索欄で全セルを大文字小文字を区別せず絞り込み
+- ヘッダー境界のドラッグで列幅を変更
+- セルの右クリックでセルまたは行をコピー
+- CSVアセット更新時に自動再読込
+
+Viewerは画面に見える行だけを描画し、検索時もセル文字列の全コピーを作りません。CSVの編集や保存は行わず、表示にはRuntimeと同じParserを使用します。
 
 ## Inspector Validation
 
