@@ -96,6 +96,7 @@ CsvRow / CsvColumn / CsvCell
 | 型 | 役割 |
 |---|---|
 | `CsvEnumSchema<TField>` | Enum値とCSV列番号を対応付ける |
+| `CsvSchemaAttribute` | EnumをUnity Inspectorのスキーマ候補として登録する |
 | `CsvHeaderAttribute` | Enum名と異なるヘッダー名を指定する |
 | `CsvHeaderPatternAttribute` | 複数表記を正規表現で一意に対応付ける |
 | `CsvTable<TField>` | `CsvDocument` とEnumスキーマを組み合わせる |
@@ -147,6 +148,21 @@ public enum ItemField
 
 対応候補が0件または複数件の場合や、複数のEnumフィールドが同じCSV列へ対応した場合は、曖昧なスキーマとして `CsvSchemaException` を送出します。
 
+### Unity Editor
+
+| 型 | 役割 |
+|---|---|
+| `CsvInspectorEditor` | Unity標準TextAsset InspectorへCSV専用の文字コード変換・Viewer・Validationを追加する |
+| `CsvEncodingUtility` | 元バイト列の文字コードを検査し、明示された文字コードからUTF-8へ変換する |
+| `CsvViewerWindow` | CSVアセットの選択、解析、検索条件、再読込を管理する |
+| `CsvViewerTable` | 表示範囲の行だけを描画し、75〜200%の拡大率、列幅変更、コピー操作を提供する |
+
+ViewerはEditor専用であり、`CsvDocument`を読み取り専用データとして利用します。表示用文字列は最大256行分だけキャッシュし、CSV全体を表示専用の二次元文字列配列へ複製しません。編集や書き出しは別の責務とします。拡大率は描画時の行高・列幅・文字サイズへ適用し、CSVデータやキャッシュ内容は複製しません。
+
+Unityの`CustomEditor`はファイル拡張子で対象を限定できないため、`CsvInspectorEditor`はCSV以外ではUnity標準のTextAsset Inspectorへ表示を委譲します。CSVでは本文のテキストプレビューを省略し、表形式のViewerを入口にします。CSV用UIは拡張子が`.csv`のアセットにだけ追加します。
+
+文字コード検査はUnityが生成した`TextAsset.text`ではなく、プロジェクト内の元CSVファイルをバイト列として読み取ります。BOMを優先し、BOMなしは厳密なUTF-8、次にShift_JIS（CP932）として検査します。誤判定時はInspectorで変換元を指定できます。ファイルの自動書き換えは行わず、確認ダイアログを伴う手動操作だけでUTF-8（BOMなし）へ変換します。
+
 ### 型変換
 
 | 型 | 役割 |
@@ -187,19 +203,30 @@ if (index.TryFindFirst("Text", out int rowIndex))
 | 型 | 役割 |
 |---|---|
 | `CsvValidationSchema<TField>` | Enum属性を一度読み取り、検証規則へ変換する |
+| `CsvConditionEvaluator` | コンパイル済みConditionを行ごとに評価する内部クラス |
 | `CsvValidator` | `CsvTable<TField>` を規則に従って検証する |
-| `CsvValidationContext` | 外部キー検証で参照先CSVを登録する |
 | `CsvValidationResult` | エラーと警告を保持する |
 
-Validationは次の3種類へ分けます。
+Validationは次の2種類へ分けます。
 
 | 種類 | 制約 |
 |---|---|
 | セル・行単位 | `NotNull`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、文字列長 |
 | 列全体 | `PrimaryKey`、`Unique` |
-| CSV間 | `ForeignKey` |
 
-`PrimaryKey` と `Unique` は、各行の検証中に列全体を繰り返し走査せず、列ごとに一度だけ検証します。
+`ConditionAttribute`は対象フィールドに付いたValidation属性の適用行を限定します。スキーマ生成時に条件列をEnumへ解決し、Reflectionは行評価中に実行しません。同じ`ConditionGroup`の条件はANDで評価され、Validation属性は同じ番号の条件グループだけを参照します。グループ0にConditionがなければ、従来どおり無条件で適用します。
+
+Validation属性は属性1個につき内部規則1個へ変換します。このため、同じ列へCommand別の`TypeConstraint`を複数定義できます。条件は制約を実行するかだけを決め、条件不成立自体をValidationエラーにはしません。
+
+### Unity Inspectorでのスキーマ発見
+
+`CsvSchemaAttribute`をEnumへ付けると、Unity Editorは`TypeCache`を使ってその型を発見し、CSV Inspectorの`Validation Schema`候補へ表示します。Enumを特定の名前空間へ置く必要はありません。
+
+この属性はEditor上の発見だけを担当します。Runtimeの`CsvDocument.WithFields<TField>()`や`CSVLoader.LoadTable<TField>()`は、属性がないEnumも従来どおり利用できます。
+
+v0.xでは互換性のため、`CSV4Unity.Fields`名前空間にある属性なしEnumも候補へ含めます。この名前空間規約は新規コードでは使用せず、明示的に`CsvSchemaAttribute`を付けます。
+
+`PrimaryKey` と `Unique` は条件に一致する行集合を一度だけ走査します。無条件の場合も、各行のセル検証中に列全体を繰り返し走査しません。
 
 ## 依存関係のルール
 

@@ -26,13 +26,15 @@ CSVをクラスへ一括変換せず、セルを必要なときに指定した�
 - 検索用インデックスの明示生成
 - Enum属性によるValidation
 - CSV Inspectorからの手動Validation
+- CSV Inspectorでの文字コード検査とUTF-8変換
+- 読み取り専用CSV Viewer
 
 ## インストール
 
 Unity Package Managerの `Add package from git URL...` に次のURLを指定します。
 
 ```text
-https://github.com/cotore-game/CSV4Unity.git?path=/Assets/Plugins/CSVLoader#v0.2.0
+https://github.com/cotore-game/CSV4Unity.git?path=/Assets/Plugins/CSVLoader#v0.3.0
 ```
 
 安定した利用には、リリースタグまたはコミットを固定したURLを使用してください。
@@ -192,14 +194,107 @@ foreach (ValidationError error in result.Errors)
 }
 ```
 
-利用可能な制約は `PrimaryKey`、`NotNull`、`Unique`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、`MinLength`、`MaxLength`、`ForeignKey` です。
+利用可能な制約は `PrimaryKey`、`NotNull`、`Unique`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、`MinLength`、`MaxLength` です。
+
+### 条件付きValidation
+
+`Condition`を付けると、条件が成立した行だけValidation属性を適用できます。同じグループの条件はすべてANDとして評価されます。
+
+```csharp
+public enum ScenarioField
+{
+    Command,
+    Enabled,
+
+    [Condition(1, ScenarioField.Command, Compare.Equal, "Wait")]
+    [Condition(1, ScenarioField.Enabled, Compare.Equal, true)]
+    [NotNull(ConditionGroup = 1)]
+    [TypeConstraint(typeof(int), ConditionGroup = 1)]
+
+    [Condition(2, ScenarioField.Command, Compare.Equal, "SetFlag")]
+    [NotNull(ConditionGroup = 2)]
+    [TypeConstraint(typeof(bool), ConditionGroup = 2)]
+    Arg1
+}
+```
+
+グループを省略した場合はグループ0になります。単一条件なら番号を記述する必要はありません。
+
+```csharp
+[Condition(ScenarioField.Command, Compare.In, "Text", "Choice")]
+[NotNull]
+Text
+```
+
+`Compare`は `Equal`、`NotEqual`、`GreaterThan`、`GreaterThanOrEqual`、`LessThan`、`LessThanOrEqual`、`IsEmpty`、`IsNotEmpty`、`In`、`NotIn` を使用できます。文字列比較は既定で大文字小文字を区別し、`IgnoreCase = true`で無視できます。数値比較では数値リテラルを渡してください。
+
+```csharp
+[Condition(ScenarioField.Duration, Compare.GreaterThan, 0)]
+[Range(0, 10)]
+Arg1
+```
+
+比較値に同じEnum型のフィールドを指定すると、同じ行の列同士を比較します。
+
+```csharp
+[Condition(ScenarioField.Start, Compare.LessThanOrEqual, ScenarioField.End)]
+[NotNull]
+Text
+```
+
+Conditionは上から順に実行される`if / else`ではありません。各グループは独立して評価されるため、条件が重なると複数のValidationが同時に適用されます。else相当は`NotIn`や`NotEqual`で明示してください。
+
+## CSV Encoding
+
+RuntimeのCSV読み込みはUTF-8を前提とします。ProjectウィンドウでCSVを選択すると、Inspectorの `CSV Encoding` に元ファイルの判定結果とデコード後のプレビューが表示されます。
+
+Shift_JIS、UTF-16、UTF-32のCSVは、内容を確認してから `Convert to UTF-8` を押してください。変換結果はUTF-8（BOMなし）で元のCSVへ保存され、Gitの変更対象になります。自動判定が正しくない場合は `Source Encoding` で変換元を明示できます。
+
+CSV4Unityはインポート時にファイルを自動変換しません。変換前のCSVでは文字化けを避けるため、ViewerとInspector Validationを実行できません。
+
+## CSV Viewer
+
+ProjectウィンドウでCSVを選択し、Inspectorの `Open CSV Viewer` を押すと、CSVを読み取り専用の表として確認できます。CSVを右クリックして `Open in CSV Viewer` を選ぶか、`Window > CSV4Unity > CSV Viewer` から開くこともできます。
+
+- `Header` で先頭行をヘッダーとして扱うか切り替え
+- `Zoom` で表を75%から200%まで拡大・縮小
+- 検索欄で全セルを大文字小文字を区別せず絞り込み
+- ヘッダー境界のドラッグで列幅を変更
+- セルの右クリックでセルまたは行をコピー
+- CSVアセット更新時に自動再読込
+
+Viewerは画面に見える行だけを描画し、検索時もセル文字列の全コピーを作りません。CSVの編集や保存は行わず、表示にはRuntimeと同じParserを使用します。
+
+CSV用の追加UIは`.csv`のTextAssetにだけ表示されます。CSV本文のテキストプレビューはInspectorへ重複表示せず、表形式のViewerから確認します。`.txt`や`.json`など、それ以外のTextAssetはUnity標準Inspectorで表示します。
 
 ## Inspector Validation
 
-1. `CSV4Unity.Fields` 名前空間へValidation用Enumを定義します。
+1. Validation用Enumへ `[CsvSchema]` を付けます。
 2. UnityのProjectウィンドウでCSVを選択します。
 3. Inspectorの `Validation Schema` からEnumを選択します。
 4. `Validate CSV` を実行します。
+
+```csharp
+using CSV4Unity;
+using CSV4Unity.Validation;
+
+namespace MyGame.Data
+{
+    [CsvSchema]
+    public enum ItemFields
+    {
+        [PrimaryKey]
+        Id,
+
+        [NotNull]
+        Name
+    }
+}
+```
+
+`CsvSchema`はUnity EditorがInspector候補を発見するための属性です。`WithFields<TField>()`や`CSVLoader.LoadTable<TField>()`をコードから使用するだけであれば必須ではありません。
+
+旧バージョンとの互換性のため、`CSV4Unity.Fields`名前空間のEnumも当面は候補へ表示されます。新しいスキーマでは名前空間規約を使用せず、`CsvSchema`を付けてください。
 
 ## Parser設定
 

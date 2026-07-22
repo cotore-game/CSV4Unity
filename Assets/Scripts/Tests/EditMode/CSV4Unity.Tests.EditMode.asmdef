@@ -2,7 +2,8 @@
     "name": "CSV4Unity.Tests.EditMode",
     "rootNamespace": "CSV4Unity.Tests",
     "references": [
-        "CSV4Unity.Runtime"
+        "CSV4Unity.Runtime",
+        "CSV4Unity.Editor"
     ],
     "includePlatforms": [
         "Editor"

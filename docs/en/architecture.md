@@ -30,7 +30,7 @@ Parsing                 Schema                 Conversion
                             |                         |
                         CsvIndex<TKey> <--------------+
 
-Validation (next stage)
+Validation
   depends on CsvTable<TField>, CsvEnumSchema<TField>, and CsvCell
   core data classes never depend on validation
 ```
@@ -84,6 +84,7 @@ Responsibility: bind enum fields to document column indices once.
 - Reflects enum declarations only when a schema is bound.
 - Validates required headers and rejects ambiguous enum aliases.
 - Owns only the enum-to-column dictionary, never cell data.
+- `CsvSchemaAttribute` registers an enum for discovery by the Unity CSV Inspector. It is not required by runtime enum access APIs.
 - Can be inspected independently from row access and reused by validators.
 
 ### `CsvTable<TField>`
@@ -121,12 +122,26 @@ Responsibility: adapt Unity inputs to the pure C# core.
 - Delegates all parsing to `CsvParser`.
 - Does not contain parsing, conversion, indexing, or validation algorithms.
 
-## Planned validation boundary
+### Unity Editor tools
 
-Attribute metadata will be compiled into a validation schema once, then applied to `CsvTable<TField>`. Row-local rules and column/table rules must be separate:
+- `CsvInspectorEditor` delegates non-CSV assets to Unity's built-in TextAsset Inspector. For CSV assets it omits the redundant raw-text preview and adds encoding, viewer, and validation controls.
+- `CsvEncodingUtility` validates source bytes and converts a selected source encoding to UTF-8.
+- `CsvViewerWindow` owns asset selection, parsing, search state, and reload behavior.
+- `CsvViewerTable` draws only visible rows and provides 75-200% zoom, column resizing, and copy commands.
+
+The viewer treats `CsvDocument` as read-only data. It caches display strings for at most 256 rows instead of duplicating the complete CSV as a two-dimensional string array. Editing and writing remain separate future responsibilities.
+
+Encoding inspection reads the original CSV bytes instead of `TextAsset.text`. BOMs take precedence; files without a BOM are checked as strict UTF-8 and then Shift_JIS (CP932). The Inspector allows an explicit source-encoding override. Conversion is always a confirmed manual action and writes UTF-8 without a BOM; importing an asset never rewrites it automatically.
+
+## Validation boundary
+
+`CsvValidationSchema<TField>` compiles attribute metadata once and `CsvValidator` applies the resulting rules to `CsvTable<TField>`. Row-local rules and column/table rules remain separate:
 
 - Row-local: required, type, range, regex, allowed values, length.
 - Column/table: primary key and unique.
-- Cross-document: foreign key through an explicit validation context.
 
-This prevents `Unique` from rescanning an entire column once per row and prevents the core data model from depending on reflection or validation attributes.
+`ConditionAttribute` limits a validation rule to matching rows. Conditions in the same `ConditionGroup` are combined with AND. Enum fields and groups are resolved while creating the validation schema, so row evaluation performs no reflection. Each validation attribute becomes one internal rule, allowing one CSV column to use different type constraints for different commands.
+
+The internal `CsvConditionEvaluator` owns condition comparison while `CsvValidator` remains responsible for applying validation constraints.
+
+This prevents `Unique` from rescanning an entire column once per row and keeps the core data model independent from reflection and validation attributes.

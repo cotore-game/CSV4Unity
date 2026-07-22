@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -11,12 +12,32 @@ using UnityEngine;
 namespace CSV4Unity.Editor
 {
     /// <summary>
-    /// CSVのTextAssetに、Enumスキーマを使った検証UIを追加します。
+    /// CSVのTextAssetに、文字コード変換、Viewer、ValidationのUIを追加します。
     /// </summary>
     [CustomEditor(typeof(TextAsset))]
     public sealed class CsvInspectorEditor : UnityEditor.Editor
     {
-        private const string FieldsNamespace = "CSV4Unity.Fields";
+        private const string BuiltInTextAssetInspectorName = "UnityEditor.TextAssetInspector";
+        private static readonly CsvSourceEncoding[] SourceEncodingValues =
+        {
+            CsvSourceEncoding.Auto,
+            CsvSourceEncoding.Utf8,
+            CsvSourceEncoding.ShiftJis,
+            CsvSourceEncoding.Utf16LittleEndian,
+            CsvSourceEncoding.Utf16BigEndian,
+            CsvSourceEncoding.Utf32LittleEndian,
+            CsvSourceEncoding.Utf32BigEndian
+        };
+        private static readonly string[] SourceEncodingLabels =
+        {
+            "Auto Detect",
+            "UTF-8",
+            "Shift_JIS (CP932)",
+            "UTF-16 LE",
+            "UTF-16 BE",
+            "UTF-32 LE",
+            "UTF-32 BE"
+        };
         private static readonly MethodInfo ValidateDocumentMethod = typeof(CsvInspectorEditor)
             .GetMethod(nameof(ValidateDocument), BindingFlags.NonPublic | BindingFlags.Static);
 
@@ -27,22 +48,57 @@ namespace CSV4Unity.Editor
         private CsvValidationResult _validationResult;
         private Vector2 _scrollPosition;
         private bool _showValidationResults;
+        private bool _showEncodingPreview;
+        private bool _overrideEncodingDetection;
         private bool _isCsv;
+        private string _assetPath;
+        private CsvSourceEncoding _sourceEncoding;
+        private CsvEncodingInspection _automaticEncodingInspection;
+        private CsvEncodingInspection _encodingInspection;
+        private UnityEditor.Editor _builtInInspector;
 
         private void OnEnable()
         {
+            // CustomEditorは拡張子で対象を絞れないため、基礎表示はUnity標準Inspectorへ委譲する。
+            Type builtInInspectorType = FindBuiltInTextAssetInspectorType();
+            if (builtInInspectorType != null)
+            {
+                _builtInInspector = CreateEditor(targets, builtInInspectorType);
+            }
+
             _csvFile = target as TextAsset;
-            string assetPath = AssetDatabase.GetAssetPath(_csvFile);
-            _isCsv = string.Equals(Path.GetExtension(assetPath), ".csv", StringComparison.OrdinalIgnoreCase);
+            _assetPath = AssetDatabase.GetAssetPath(_csvFile);
+            _isCsv = CsvEditorAssetUtility.IsCsvPath(_assetPath);
             if (!_isCsv) return;
 
+            RefreshEncodingInspection();
             RefreshEnums();
-            RestoreSelection(assetPath);
+            RestoreSelection(_assetPath);
+        }
+
+        private void OnDisable()
+        {
+            if (_builtInInspector == null) return;
+            DestroyImmediate(_builtInInspector);
+            _builtInInspector = null;
         }
 
         public override void OnInspectorGUI()
         {
-            DrawDefaultInspector();
+            if (_isCsv)
+            {
+                // CSV本文は専用Viewerで表示するため、標準TextAssetの長いテキストプレビューは描画しない。
+                DrawDefaultInspector();
+            }
+            else if (_builtInInspector != null)
+            {
+                _builtInInspector.OnInspectorGUI();
+            }
+            else
+            {
+                DrawDefaultInspector();
+            }
+
             if (!_isCsv || _csvFile == null) return;
 
             // TextAssetの標準Inspectorは読み取り専用なので、追加UIだけ操作可能にする。
@@ -50,7 +106,7 @@ namespace CSV4Unity.Editor
             GUI.enabled = true;
             try
             {
-                DrawCsvValidationControls();
+                DrawCsvControls();
             }
             finally
             {
@@ -58,8 +114,42 @@ namespace CSV4Unity.Editor
             }
         }
 
-        private void DrawCsvValidationControls()
+        internal static Type FindBuiltInTextAssetInspectorType()
         {
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < assemblies.Length; i++)
+            {
+                Type type = assemblies[i].GetType(BuiltInTextAssetInspectorName, false);
+                if (type != null && type != typeof(CsvInspectorEditor)) return type;
+            }
+
+            return null;
+        }
+
+        private void DrawCsvControls()
+        {
+            EditorGUILayout.Space(10);
+            DrawSeparator();
+            EditorGUILayout.Space(5);
+
+            DrawEncodingControls();
+            if (!IsUtf8Ready())
+            {
+                EditorGUILayout.HelpBox(
+                    "CSV ViewerとValidationを使用する前に、CSVをUTF-8へ変換してください。",
+                    MessageType.Warning);
+                return;
+            }
+
+            EditorGUILayout.Space(10);
+            DrawSeparator();
+            EditorGUILayout.Space(5);
+            EditorGUILayout.LabelField("CSV Viewer", EditorStyles.boldLabel);
+            if (GUILayout.Button("Open CSV Viewer", GUILayout.Height(26)))
+            {
+                CsvViewerWindow.Open(_csvFile);
+            }
+
             EditorGUILayout.Space(10);
             DrawSeparator();
             EditorGUILayout.Space(5);
@@ -68,7 +158,7 @@ namespace CSV4Unity.Editor
             if (_availableEnums.Count == 0)
             {
                 EditorGUILayout.HelpBox(
-                    $"{FieldsNamespace} 名前空間にEnumが見つかりません。",
+                    "CSVスキーマが見つかりません。Enumに[CsvSchema]を付けてください。",
                     MessageType.Info);
 
                 if (GUILayout.Button("Refresh Enums")) RefreshEnums();
@@ -96,6 +186,263 @@ namespace CSV4Unity.Editor
             }
         }
 
+        private void DrawEncodingControls()
+        {
+            EditorGUILayout.LabelField("CSV Encoding", EditorStyles.boldLabel);
+
+            if (!_automaticEncodingInspection.IsValid)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Encoding could not be detected. {_automaticEncodingInspection.ErrorMessage}",
+                    MessageType.Error);
+            }
+            else if (_automaticEncodingInspection.RequiresConversion)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Detected {_automaticEncodingInspection.DisplayName}. Convert this file to UTF-8 before using it.",
+                    MessageType.Warning);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    $"Encoding: {_automaticEncodingInspection.DisplayName}",
+                    MessageType.Info);
+            }
+
+            bool overrideDetection = EditorGUILayout.ToggleLeft(
+                "Override automatic detection",
+                _overrideEncodingDetection);
+            if (overrideDetection != _overrideEncodingDetection)
+            {
+                _overrideEncodingDetection = overrideDetection;
+                if (_overrideEncodingDetection)
+                {
+                    InspectUsingSelectedEncoding();
+                    _showEncodingPreview = true;
+                }
+                else
+                {
+                    _encodingInspection = _automaticEncodingInspection;
+                }
+            }
+
+            if (_overrideEncodingDetection)
+            {
+                int selectedIndex = Array.IndexOf(SourceEncodingValues, _sourceEncoding);
+                int nextIndex = EditorGUILayout.Popup(
+                    "Source Encoding",
+                    Math.Max(selectedIndex, 0),
+                    SourceEncodingLabels);
+                CsvSourceEncoding selectedEncoding = SourceEncodingValues[nextIndex];
+                if (selectedEncoding != _sourceEncoding)
+                {
+                    _sourceEncoding = selectedEncoding;
+                    InspectUsingSelectedEncoding();
+                    _showEncodingPreview = true;
+                }
+
+                if (IsOverrideDifferentFromDetection())
+                {
+                    EditorGUILayout.HelpBox(
+                        $"Selected {_encodingInspection.DisplayName}, but automatic detection found " +
+                        $"{_automaticEncodingInspection.DisplayName}. Check the preview carefully before converting.",
+                        MessageType.Error);
+                }
+
+                if (!_encodingInspection.IsValid)
+                {
+                    EditorGUILayout.HelpBox(_encodingInspection.ErrorMessage, MessageType.Error);
+                }
+            }
+
+            if (_encodingInspection.IsValid)
+            {
+                _showEncodingPreview = EditorGUILayout.Foldout(
+                    _showEncodingPreview,
+                    "Decoded Preview",
+                    true);
+                if (_showEncodingPreview)
+                {
+                    EditorGUILayout.SelectableLabel(
+                        CreatePreview(_encodingInspection.Text),
+                        EditorStyles.textArea,
+                        GUILayout.MinHeight(80),
+                        GUILayout.MaxHeight(160));
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(!_encodingInspection.RequiresConversion))
+            {
+                if (GUILayout.Button(
+                        $"Convert {_encodingInspection.DisplayName} to UTF-8",
+                        GUILayout.Height(26)))
+                {
+                    ConvertAssetToUtf8();
+                }
+            }
+
+            DrawEncodingBackupControls();
+        }
+
+        private void RefreshEncodingInspection()
+        {
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(GetAbsoluteAssetPath());
+                _automaticEncodingInspection = CsvEncodingUtility.Inspect(bytes);
+                _encodingInspection = _automaticEncodingInspection;
+                _sourceEncoding = _automaticEncodingInspection.IsValid
+                    ? _automaticEncodingInspection.Encoding
+                    : CsvSourceEncoding.Auto;
+                _overrideEncodingDetection = !_automaticEncodingInspection.IsValid;
+                _showEncodingPreview = _encodingInspection.RequiresConversion;
+            }
+            catch (Exception exception)
+            {
+                _automaticEncodingInspection = new CsvEncodingInspection(
+                    CsvSourceEncoding.Auto,
+                    false,
+                    false,
+                    null,
+                    exception.Message);
+                _encodingInspection = _automaticEncodingInspection;
+                _sourceEncoding = CsvSourceEncoding.Auto;
+                _overrideEncodingDetection = true;
+            }
+        }
+
+        private void InspectUsingSelectedEncoding()
+        {
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(GetAbsoluteAssetPath());
+                _encodingInspection = CsvEncodingUtility.Decode(bytes, _sourceEncoding);
+            }
+            catch (Exception exception)
+            {
+                _encodingInspection = new CsvEncodingInspection(
+                    _sourceEncoding,
+                    false,
+                    false,
+                    null,
+                    exception.Message);
+            }
+        }
+
+        private void ConvertAssetToUtf8()
+        {
+            if (!_encodingInspection.RequiresConversion) return;
+
+            bool confirmed = EditorUtility.DisplayDialog(
+                "Convert CSV to UTF-8",
+                $"{_csvFile.name}.csv を {_encodingInspection.DisplayName} からUTF-8へ変換します。\n" +
+                "ファイル内容が更新され、Gitの変更対象になります。" +
+                (IsOverrideDifferentFromDetection()
+                    ? $"\n\n警告: 自動判定は {_automaticEncodingInspection.DisplayName} です。"
+                    : string.Empty),
+                "Convert",
+                "Cancel");
+            if (!confirmed) return;
+
+            try
+            {
+                string absolutePath = GetAbsoluteAssetPath();
+                byte[] source = File.ReadAllBytes(absolutePath);
+                CsvSourceEncoding sourceEncoding = _overrideEncodingDetection
+                    ? _sourceEncoding
+                    : CsvSourceEncoding.Auto;
+                byte[] utf8 = CsvEncodingUtility.ConvertToUtf8(source, sourceEncoding);
+                CsvEncodingBackupUtility.CreateIfMissing(GetBackupPath(), source);
+                CsvEncodingBackupUtility.WriteAtomically(absolutePath, utf8);
+                AssetDatabase.ImportAsset(_assetPath, ImportAssetOptions.ForceUpdate);
+                _csvFile = AssetDatabase.LoadAssetAtPath<TextAsset>(_assetPath);
+                RefreshEncodingInspection();
+                _validationResult = null;
+                _showValidationResults = false;
+                Debug.Log($"CSV4Unity: Converted '{_assetPath}' to UTF-8.", _csvFile);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"CSV4Unity: Failed to convert '{_assetPath}' to UTF-8. {exception}", _csvFile);
+                EditorUtility.DisplayDialog("CSV Conversion Failed", exception.Message, "OK");
+                RefreshEncodingInspection();
+            }
+        }
+
+        private void DrawEncodingBackupControls()
+        {
+            if (!File.Exists(GetBackupPath())) return;
+
+            EditorGUILayout.HelpBox(
+                "The original bytes from before the first conversion are available as a backup.",
+                MessageType.Info);
+            if (GUILayout.Button("Restore Pre-conversion File")) RestoreEncodingBackup();
+        }
+
+        private void RestoreEncodingBackup()
+        {
+            bool confirmed = EditorUtility.DisplayDialog(
+                "Restore CSV Before Conversion",
+                $"{_csvFile.name}.csv を最初の文字コード変換前の状態へ戻します。",
+                "Restore",
+                "Cancel");
+            if (!confirmed) return;
+
+            try
+            {
+                CsvEncodingBackupUtility.Restore(GetBackupPath(), GetAbsoluteAssetPath());
+                AssetDatabase.ImportAsset(_assetPath, ImportAssetOptions.ForceUpdate);
+                _csvFile = AssetDatabase.LoadAssetAtPath<TextAsset>(_assetPath);
+                RefreshEncodingInspection();
+                _validationResult = null;
+                _showValidationResults = false;
+                Debug.Log($"CSV4Unity: Restored the pre-conversion file for '{_assetPath}'.", _csvFile);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"CSV4Unity: Failed to restore '{_assetPath}'. {exception}", _csvFile);
+                EditorUtility.DisplayDialog("CSV Restore Failed", exception.Message, "OK");
+            }
+        }
+
+        private bool IsOverrideDifferentFromDetection()
+        {
+            return _overrideEncodingDetection &&
+                   _automaticEncodingInspection.IsValid &&
+                   _sourceEncoding != CsvSourceEncoding.Auto &&
+                   _sourceEncoding != _automaticEncodingInspection.Encoding;
+        }
+
+        private bool IsUtf8Ready()
+        {
+            return _encodingInspection.IsValid &&
+                   _encodingInspection.Encoding == CsvSourceEncoding.Utf8;
+        }
+
+        private string GetAbsoluteAssetPath()
+        {
+            return Path.GetFullPath(_assetPath);
+        }
+
+        private string GetBackupPath()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+            string assetGuid = AssetDatabase.AssetPathToGUID(_assetPath);
+            return Path.Combine(
+                projectRoot ?? Path.GetFullPath("."),
+                "Library",
+                "CSV4Unity",
+                "EncodingBackups",
+                assetGuid + ".bytes");
+        }
+
+        private static string CreatePreview(string text)
+        {
+            const int maxLength = 2000;
+            if (string.IsNullOrEmpty(text) || text.Length <= maxLength) return text ?? string.Empty;
+            return text.Substring(0, maxLength) + "\n...";
+        }
+
         private void DrawSchemaSelector()
         {
             string[] options = new string[_availableEnums.Count + 1];
@@ -108,43 +455,169 @@ namespace CSV4Unity.Editor
 
             int popupIndex = EditorGUILayout.Popup("Validation Schema", _selectedEnumIndex + 1, options);
             int enumIndex = popupIndex - 1;
-            if (enumIndex == _selectedEnumIndex) return;
+            if (enumIndex != _selectedEnumIndex)
+            {
+                _selectedEnumIndex = enumIndex;
+                _selectedEnumType = enumIndex >= 0 ? _availableEnums[enumIndex] : null;
+                _validationResult = null;
+                _showValidationResults = false;
+                SaveSelection();
+            }
 
-            _selectedEnumIndex = enumIndex;
-            _selectedEnumType = enumIndex >= 0 ? _availableEnums[enumIndex] : null;
-            _validationResult = null;
-            _showValidationResults = false;
-            SaveSelection();
+            if (_selectedEnumType != null && CsvSchemaTypeDiscovery.IsLegacySchema(_selectedEnumType))
+            {
+                EditorGUILayout.HelpBox(
+                    "このスキーマは旧CSV4Unity.Fields名前空間規約で検出されています。" +
+                    "Enumに[CsvSchema]を付けると、任意の名前空間へ配置できます。",
+                    MessageType.Info);
+            }
         }
 
         private void DrawConstraints(Type enumType)
         {
             EditorGUILayout.Space(5);
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField($"Constraints: {enumType.Name}", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Schema Preview: {enumType.Name}", EditorStyles.boldLabel);
+            EditorGUILayout.Space(3);
 
             bool hasConstraints = false;
             FieldInfo[] fields = enumType.GetFields(BindingFlags.Public | BindingFlags.Static);
             for (int i = 0; i < fields.Length; i++)
             {
                 object[] attributes = fields[i].GetCustomAttributes(false);
-                List<string> labels = attributes
-                    .OfType<Attribute>()
-                    .Select(GetAttributeDisplayText)
-                    .Where(label => label != null)
-                    .ToList();
+                ConditionAttribute[] conditions = attributes.OfType<ConditionAttribute>().ToArray();
+                CsvValidationAttribute[] validations = attributes.OfType<CsvValidationAttribute>().ToArray();
 
-                if (labels.Count == 0) continue;
+                if (conditions.Length == 0 && validations.Length == 0) continue;
+                if (hasConstraints)
+                {
+                    EditorGUILayout.Space(5);
+                    DrawSeparator();
+                    EditorGUILayout.Space(5);
+                }
+
                 hasConstraints = true;
-                EditorGUILayout.LabelField(fields[i].Name, string.Join(", ", labels));
+                DrawFieldConstraints(fields[i].Name, conditions, validations);
             }
 
             if (!hasConstraints)
             {
-                EditorGUILayout.LabelField("制約属性は定義されていません。", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("No validation constraints are defined.", EditorStyles.miniLabel);
             }
 
             EditorGUILayout.EndVertical();
+        }
+
+        private static void DrawFieldConstraints(
+            string fieldName,
+            IReadOnlyList<ConditionAttribute> conditions,
+            IReadOnlyList<CsvValidationAttribute> validations)
+        {
+            EditorGUILayout.LabelField(fieldName, EditorStyles.boldLabel);
+
+            int[] groups = conditions
+                .Select(condition => condition.Group)
+                .Concat(validations.Select(validation => validation.ConditionGroup))
+                .Distinct()
+                .OrderBy(group => group)
+                .ToArray();
+
+            GUIStyle expressionStyle = new GUIStyle(EditorStyles.wordWrappedLabel)
+            {
+                padding = new RectOffset(8, 4, 1, 1)
+            };
+
+            for (int i = 0; i < groups.Length; i++)
+            {
+                int group = groups[i];
+                ConditionAttribute[] groupConditions = conditions
+                    .Where(condition => condition.Group == group)
+                    .ToArray();
+                CsvValidationAttribute[] groupValidations = validations
+                    .Where(validation => validation.ConditionGroup == group)
+                    .ToArray();
+
+                if (i > 0) EditorGUILayout.Space(4);
+
+                string conditionExpression = groupConditions.Length == 0
+                    ? group == 0 ? "ALWAYS" : $"IF (GROUP {group} HAS NO CONDITION)"
+                    : $"IF ({string.Join(" && ", groupConditions.Select(FormatCondition))})";
+                EditorGUILayout.LabelField(conditionExpression, expressionStyle);
+
+                string validationExpression = groupValidations.Length == 0
+                    ? "NO CONSTRAINT"
+                    : string.Join(" && ", groupValidations.Select(GetValidationDisplayText));
+                EditorGUILayout.LabelField(
+                    $"=> {fieldName}: {validationExpression}",
+                    expressionStyle);
+            }
+        }
+
+        private static string FormatCondition(ConditionAttribute condition)
+        {
+            string field = condition.Field?.ToString() ?? "null";
+            string suffix = condition.IgnoreCase ? " [IGNORE CASE]" : string.Empty;
+
+            switch (condition.Comparison)
+            {
+                case Compare.Equal:
+                    return $"{field} == {FormatSingleValue(condition)}{suffix}";
+                case Compare.NotEqual:
+                    return $"{field} != {FormatSingleValue(condition)}{suffix}";
+                case Compare.GreaterThan:
+                    return $"{field} > {FormatSingleValue(condition)}";
+                case Compare.GreaterThanOrEqual:
+                    return $"{field} >= {FormatSingleValue(condition)}";
+                case Compare.LessThan:
+                    return $"{field} < {FormatSingleValue(condition)}";
+                case Compare.LessThanOrEqual:
+                    return $"{field} <= {FormatSingleValue(condition)}";
+                case Compare.IsEmpty:
+                    return $"{field} IS EMPTY";
+                case Compare.IsNotEmpty:
+                    return $"{field} IS NOT EMPTY";
+                case Compare.In:
+                    return $"{field} IN ({string.Join(", ", condition.Values.Select(FormatValue))}){suffix}";
+                case Compare.NotIn:
+                    return $"{field} NOT IN ({string.Join(", ", condition.Values.Select(FormatValue))}){suffix}";
+                default:
+                    return $"{field} {condition.Comparison}";
+            }
+        }
+
+        private static string FormatSingleValue(ConditionAttribute condition)
+        {
+            return condition.Values.Length == 0 ? "<?>" : FormatValue(condition.Values[0]);
+        }
+
+        private static string FormatValue(object value)
+        {
+            switch (value)
+            {
+                case null:
+                    return "null";
+                case string text:
+                    return $"\"{EscapeValue(text)}\"";
+                case char character:
+                    return $"'{EscapeValue(character.ToString())}'";
+                case bool boolean:
+                    return boolean ? "true" : "false";
+                case Enum enumValue:
+                    return enumValue.ToString();
+                case IFormattable formattable:
+                    return formattable.ToString(null, CultureInfo.InvariantCulture);
+                default:
+                    return value.ToString();
+            }
+        }
+
+        private static string EscapeValue(string value)
+        {
+            return value
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n");
         }
 
         private void ExecuteValidation()
@@ -232,38 +705,7 @@ namespace CSV4Unity.Editor
         private void RefreshEnums()
         {
             _availableEnums.Clear();
-
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int i = 0; i < assemblies.Length; i++)
-            {
-                foreach (Type type in GetLoadableTypes(assemblies[i]))
-                {
-                    if (type.IsEnum && type.Namespace != null &&
-                        type.Namespace.StartsWith(FieldsNamespace, StringComparison.Ordinal))
-                    {
-                        _availableEnums.Add(type);
-                    }
-                }
-            }
-
-            _availableEnums.Sort((left, right) =>
-                string.Compare(left.FullName, right.FullName, StringComparison.Ordinal));
-        }
-
-        private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
-        {
-            try
-            {
-                return assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException exception)
-            {
-                return exception.Types.Where(type => type != null);
-            }
-            catch
-            {
-                return Array.Empty<Type>();
-            }
+            _availableEnums.AddRange(CsvSchemaTypeDiscovery.FindAll());
         }
 
         private void RestoreSelection(string assetPath)
@@ -292,32 +734,30 @@ namespace CSV4Unity.Editor
             return $"CSV4Unity.SelectedEnum.{AssetDatabase.AssetPathToGUID(assetPath)}";
         }
 
-        private static string GetAttributeDisplayText(Attribute attribute)
+        private static string GetValidationDisplayText(CsvValidationAttribute attribute)
         {
             switch (attribute)
             {
                 case PrimaryKeyAttribute:
-                    return "[PrimaryKey]";
+                    return "PRIMARY KEY";
                 case NotNullAttribute:
-                    return "[NotNull]";
+                    return "VALUE IS NOT EMPTY";
                 case UniqueAttribute:
-                    return "[Unique]";
+                    return "UNIQUE";
                 case TypeConstraintAttribute typeConstraint:
-                    return $"[Type: {typeConstraint.ExpectedType.Name}]";
+                    return $"TYPE = {typeConstraint.ExpectedType.Name}";
                 case Validation.RangeAttribute range:
-                    return $"[Range: {range.Min}-{range.Max}]";
+                    return $"{FormatValue(range.Min)} <= VALUE <= {FormatValue(range.Max)}";
                 case RegexAttribute regex:
-                    return $"[Regex: {regex.Pattern}]";
+                    return $"MATCHES {FormatValue(regex.Pattern)}";
                 case AllowedValuesAttribute allowed:
-                    return $"[Allowed: {string.Join("|", allowed.AllowedValues)}]";
+                    return $"VALUE IN ({string.Join(", ", allowed.AllowedValues.Select(FormatValue))})";
                 case MinLengthAttribute minLength:
-                    return $"[MinLength: {minLength.MinLength}]";
+                    return $"LENGTH >= {minLength.MinLength}";
                 case MaxLengthAttribute maxLength:
-                    return $"[MaxLength: {maxLength.MaxLength}]";
-                case ForeignKeyAttribute foreignKey:
-                    return $"[ForeignKey: {foreignKey.ReferenceEnumType.Name}.{foreignKey.ReferenceField}]";
+                    return $"LENGTH <= {maxLength.MaxLength}";
                 default:
-                    return null;
+                    return attribute.GetType().Name;
             }
         }
 

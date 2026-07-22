@@ -3,7 +3,7 @@ using System;
 namespace CSV4Unity
 {
     /// <summary>
-    /// CSVヘッダーとEnumスキーマを対応付けられない場合に送出される例外です。
+    /// CSVヘッダー、Enumフィールド、またはValidation属性から有効なスキーマを構築できない場合に送出される例外です。
     /// </summary>
     public sealed class CsvSchemaException : InvalidOperationException
     {

@@ -1,0 +1,9 @@
+Command,Enabled,Arg
+A,true,
+A,false,invalid
+A,true,invalid
+A,true,10
+B,true,invalid
+B,true,true
+C,true,invalid
+C,true,fallback

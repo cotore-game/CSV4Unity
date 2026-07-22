@@ -1,5 +1,5 @@
 ﻿using System;
-using CSV4Unity.Fields;
+using CSV4Unity.Examples;
 using CSV4Unity.Validation;
 using UnityEngine;
 
@@ -22,6 +22,10 @@ namespace CSV4Unity.Tests.Manual
         [SerializeField]
         [Tooltip("Assets/TestData/CSV4Unity/ValidationInvalid.csv を指定してください")]
         private TextAsset invalidValidationCsv;
+
+        [SerializeField]
+        [Tooltip("Assets/TestData/CSV4Unity/ConditionalValidation.csv を指定してください")]
+        private TextAsset conditionalValidationCsv;
 
         [SerializeField]
         [Tooltip("Assets/TestData/CSV4Unity/HugeData.csv を指定してください")]
@@ -50,6 +54,7 @@ namespace CSV4Unity.Tests.Manual
                 CheckScenarioAccess(ref passed);
                 CheckRfc4180(ref passed);
                 CheckValidation(ref passed);
+                CheckConditionalValidation(ref passed);
                 CheckLargeCsv(ref passed);
                 CheckHeaderMapping(ref passed);
 
@@ -108,6 +113,18 @@ namespace CSV4Unity.Tests.Manual
             passed += 2;
         }
 
+        private void CheckConditionalValidation(ref int passed)
+        {
+            CsvTable<ConditionalValidationFields> table = CSVLoader
+                .LoadTable<ConditionalValidationFields>(conditionalValidationCsv);
+            CsvValidationResult result = CsvValidator.Validate(table);
+
+            Require(!result.IsValid, "ConditionalValidation.csvがValidとして扱われました。");
+            Require(result.Errors.Count == 4, $"条件付きValidationの想定エラー数は4件ですが、実際は{result.Errors.Count}件です。");
+
+            passed += 2;
+        }
+
         private void CheckHeaderMapping(ref int passed)
         {
             CsvTable<HeaderMappingFields> table = CSVLoader.LoadTable<HeaderMappingFields>(headerMappingCsv);
@@ -124,6 +141,7 @@ namespace CSV4Unity.Tests.Manual
             Require(scenarioCsv != null, "scenarioCsv に Scenario.csv を指定してください。");
             Require(rfc4180Csv != null, "rfc4180Csv に Rfc4180.csv を指定してください。");
             Require(invalidValidationCsv != null, "invalidValidationCsv に ValidationInvalid.csv を指定してください。");
+            Require(conditionalValidationCsv != null, "conditionalValidationCsv に ConditionalValidation.csv を指定してください。");
             Require(hugeDataCsv != null, "hugeDataCsv に HugeData.csv を指定してください。");
             Require(headerMappingCsv != null, "headerMappingCsv に HeaderMapping.csv を指定してください。");
         }

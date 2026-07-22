@@ -1,8 +1,9 @@
-namespace CSV4Unity.Fields
+namespace CSV4Unity.Tests.Manual
 {
     /// <summary>
-    /// HugeData.csvの列アクセス確認に使用するスキーマです。
+    /// HugeData.csvをRuntime APIで読み込むための手動確認用スキーマです。
     /// </summary>
+    /// <remarks>Inspectorへ登録しないため、CsvSchema属性は付けません。</remarks>
     public enum HugeDataFields
     {
         a,
