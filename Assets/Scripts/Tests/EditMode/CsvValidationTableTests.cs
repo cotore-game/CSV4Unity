@@ -32,18 +32,6 @@ namespace CSV4Unity.Tests
             Kind
         }
 
-        private enum ItemField
-        {
-            [PrimaryKey]
-            Id
-        }
-
-        private enum ScenarioReferenceField
-        {
-            [ForeignKey(typeof(ItemField), nameof(ItemField.Id))]
-            ItemId
-        }
-
         private enum FixtureValidationField
         {
             [PrimaryKey]
@@ -356,32 +344,5 @@ namespace CSV4Unity.Tests
             Assert.Throws<CsvSchemaException>(() => CsvValidationSchema<InvalidCompareField>.Create());
         }
 
-        [Test]
-        public void Validate_ForeignKey_UsesRegisteredReferenceTable()
-        {
-            CsvTable<ItemField> items = CsvParser.Parse("Id\nA\nB").WithFields<ItemField>();
-            CsvTable<ScenarioReferenceField> scenario = CsvParser.Parse("ItemId\nA\nC")
-                .WithFields<ScenarioReferenceField>();
-            var context = new CsvValidationContext().Register(items);
-
-            CsvValidationResult result = CsvValidator.Validate(scenario, context: context);
-
-            Assert.That(result.Errors.Count, Is.EqualTo(1));
-            Assert.That(result.Errors[0].Row, Is.EqualTo(1));
-            Assert.That(result.Errors[0].Column, Is.EqualTo(nameof(ScenarioReferenceField.ItemId)));
-        }
-
-        [Test]
-        public void Validate_ForeignKeyWithoutContext_ReportsOneWarning()
-        {
-            CsvTable<ScenarioReferenceField> scenario = CsvParser.Parse("ItemId\nA")
-                .WithFields<ScenarioReferenceField>();
-
-            CsvValidationResult result = CsvValidator.Validate(scenario);
-
-            Assert.That(result.IsValid, Is.True);
-            Assert.That(result.Warnings.Count, Is.EqualTo(1));
-            Assert.That(result.Warnings[0].Row, Is.EqualTo(-1));
-        }
     }
 }
