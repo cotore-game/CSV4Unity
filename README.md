@@ -26,6 +26,7 @@ CSVをクラスへ一括変換せず、セルを必要なときに指定した�
 - 検索用インデックスの明示生成
 - Enum属性によるValidation
 - CSV Inspectorからの手動Validation
+- CSV Inspectorでの文字コード検査とUTF-8変換
 - 読み取り専用CSV Viewer
 
 ## インストール
@@ -242,6 +243,14 @@ Text
 ```
 
 Conditionは上から順に実行される`if / else`ではありません。各グループは独立して評価されるため、条件が重なると複数のValidationが同時に適用されます。else相当は`NotIn`や`NotEqual`で明示してください。
+
+## CSV Encoding
+
+RuntimeのCSV読み込みはUTF-8を前提とします。ProjectウィンドウでCSVを選択すると、Inspectorの `CSV Encoding` に元ファイルの判定結果とデコード後のプレビューが表示されます。
+
+Shift_JIS、UTF-16、UTF-32のCSVは、内容を確認してから `Convert to UTF-8` を押してください。変換結果はUTF-8（BOMなし）で元のCSVへ保存され、Gitの変更対象になります。自動判定が正しくない場合は `Source Encoding` で変換元を明示できます。
+
+CSV4Unityはインポート時にファイルを自動変換しません。変換前のCSVでは文字化けを避けるため、ViewerとInspector Validationを実行できません。
 
 ## CSV Viewer
 
