@@ -12,11 +12,13 @@ namespace CSV4Unity.Editor
     /// </summary>
     internal sealed class CsvViewerTable
     {
-        private const float HeaderHeight = 24f;
-        private const float RowHeight = 21f;
-        private const float RowNumberWidth = 56f;
+        private const float BaseHeaderHeight = 24f;
+        private const float BaseRowHeight = 21f;
+        private const float BaseRowNumberWidth = 56f;
         private const float MinimumColumnWidth = 64f;
         private const float MaximumInitialColumnWidth = 280f;
+        private const float MinimumZoom = 0.75f;
+        private const float MaximumZoom = 2f;
         private const int CellCacheRowLimit = 256;
 
         private readonly CsvDocument _document;
@@ -31,6 +33,10 @@ namespace CSV4Unity.Editor
         private int _resizingColumn = -1;
         private float _resizeStartMouseX;
         private float _resizeStartWidth;
+        private float _zoom = 1f;
+        private GUIStyle _headerStyle;
+        private GUIStyle _cellStyle;
+        private GUIStyle _rowNumberStyle;
 
         public CsvViewerTable(CsvDocument document)
         {
@@ -43,6 +49,19 @@ namespace CSV4Unity.Editor
         public int ColumnCount => _document.ColumnCount;
 
         public int FilteredRowCount => string.IsNullOrEmpty(_searchText) ? RowCount : _filteredRows.Count;
+
+        internal float Zoom => _zoom;
+
+        public void SetZoom(float zoom)
+        {
+            float clamped = Mathf.Clamp(zoom, MinimumZoom, MaximumZoom);
+            if (Mathf.Approximately(_zoom, clamped)) return;
+
+            _zoom = clamped;
+            _headerStyle = null;
+            _cellStyle = null;
+            _rowNumberStyle = null;
+        }
 
         public void SetSearch(string searchText)
         {
@@ -66,12 +85,14 @@ namespace CSV4Unity.Editor
 
         public void OnGUI(Rect rect)
         {
-            if (rect.width <= 0f || rect.height <= HeaderHeight) return;
+            float headerHeight = BaseHeaderHeight * _zoom;
+            float rowHeight = BaseRowHeight * _zoom;
+            if (rect.width <= 0f || rect.height <= headerHeight) return;
 
-            Rect headerRect = new Rect(rect.x, rect.y, rect.width, HeaderHeight);
-            Rect bodyRect = new Rect(rect.x, rect.y + HeaderHeight, rect.width, rect.height - HeaderHeight);
+            Rect headerRect = new Rect(rect.x, rect.y, rect.width, headerHeight);
+            Rect bodyRect = new Rect(rect.x, rect.y + headerHeight, rect.width, rect.height - headerHeight);
             float contentWidth = CalculateContentWidth();
-            float contentHeight = Mathf.Max(bodyRect.height, FilteredRowCount * RowHeight);
+            float contentHeight = Mathf.Max(bodyRect.height, FilteredRowCount * rowHeight);
 
             _scrollPosition = GUI.BeginScrollView(
                 bodyRect,
@@ -91,51 +112,59 @@ namespace CSV4Unity.Editor
             EditorGUI.DrawRect(rect, new Color(0.16f, 0.16f, 0.16f, 1f));
             GUI.BeginGroup(rect);
 
+            float headerHeight = BaseHeaderHeight * _zoom;
+            float rowNumberWidth = BaseRowNumberWidth * _zoom;
             float x = -_scrollPosition.x;
-            DrawHeaderCell(new Rect(x, 0f, RowNumberWidth, HeaderHeight), "#");
-            x += RowNumberWidth;
+            DrawHeaderCell(new Rect(x, 0f, rowNumberWidth, headerHeight), "#");
+            x += rowNumberWidth;
 
             for (int columnIndex = 0; columnIndex < ColumnCount; columnIndex++)
             {
-                float width = _columnWidths[columnIndex];
+                float width = _columnWidths[columnIndex] * _zoom;
                 string name = _document.HasHeader
                     ? _document.Headers[columnIndex]
                     : $"Column {columnIndex + 1}";
-                DrawHeaderCell(new Rect(x, 0f, width, HeaderHeight), name);
-                HandleColumnResize(columnIndex, new Rect(x + width - 3f, 0f, 6f, HeaderHeight));
+                DrawHeaderCell(new Rect(x, 0f, width, headerHeight), name);
+                HandleColumnResize(columnIndex, new Rect(x + width - 3f, 0f, 6f, headerHeight));
                 x += width;
             }
 
             if (x < contentWidth - _scrollPosition.x)
             {
                 EditorGUI.DrawRect(
-                    new Rect(x, 0f, contentWidth - _scrollPosition.x - x, HeaderHeight),
+                    new Rect(x, 0f, contentWidth - _scrollPosition.x - x, headerHeight),
                     new Color(0.16f, 0.16f, 0.16f, 1f));
             }
 
             GUI.EndGroup();
         }
 
-        private static void DrawHeaderCell(Rect rect, string text)
+        private void DrawHeaderCell(Rect rect, string text)
         {
             GUI.Box(rect, GUIContent.none, EditorStyles.toolbarButton);
             GUI.Label(
-                new Rect(rect.x + 6f, rect.y + 2f, Mathf.Max(0f, rect.width - 12f), rect.height - 4f),
+                new Rect(
+                    rect.x + (6f * _zoom),
+                    rect.y + (2f * _zoom),
+                    Mathf.Max(0f, rect.width - (12f * _zoom)),
+                    rect.height - (4f * _zoom)),
                 new GUIContent(text, text),
-                EditorStyles.boldLabel);
+                HeaderStyle);
         }
 
         private void DrawVisibleRows(float viewportHeight, float contentWidth)
         {
-            int firstRow = Mathf.Max(0, Mathf.FloorToInt(_scrollPosition.y / RowHeight));
-            int visibleCount = Mathf.CeilToInt(viewportHeight / RowHeight) + 2;
+            float rowHeight = BaseRowHeight * _zoom;
+            float rowNumberWidth = BaseRowNumberWidth * _zoom;
+            int firstRow = Mathf.Max(0, Mathf.FloorToInt(_scrollPosition.y / rowHeight));
+            int visibleCount = Mathf.CeilToInt(viewportHeight / rowHeight) + 2;
             int lastRow = Mathf.Min(FilteredRowCount, firstRow + visibleCount);
 
             for (int displayRow = firstRow; displayRow < lastRow; displayRow++)
             {
                 int sourceRow = GetSourceRow(displayRow);
-                float y = displayRow * RowHeight;
-                Rect rowRect = new Rect(0f, y, contentWidth, RowHeight);
+                float y = displayRow * rowHeight;
+                Rect rowRect = new Rect(0f, y, contentWidth, rowHeight);
 
                 if ((displayRow & 1) != 0)
                 {
@@ -146,21 +175,25 @@ namespace CSV4Unity.Editor
 
                 float x = 0f;
                 GUI.Label(
-                    new Rect(x + 5f, y + 1f, RowNumberWidth - 10f, RowHeight - 2f),
+                    new Rect(
+                        x + (5f * _zoom),
+                        y + _zoom,
+                        rowNumberWidth - (10f * _zoom),
+                        rowHeight - (2f * _zoom)),
                     (sourceRow + 1).ToString(),
-                    EditorStyles.miniLabel);
-                x += RowNumberWidth;
+                    RowNumberStyle);
+                x += rowNumberWidth;
 
                 string[] cellTexts = GetRowTexts(sourceRow);
                 for (int columnIndex = 0; columnIndex < ColumnCount; columnIndex++)
                 {
-                    float width = _columnWidths[columnIndex];
-                    Rect cellRect = new Rect(x, y, width, RowHeight);
+                    float width = _columnWidths[columnIndex] * _zoom;
+                    Rect cellRect = new Rect(x, y, width, rowHeight);
                     DrawCell(displayRow, columnIndex, cellRect, cellTexts[columnIndex]);
                     x += width;
                 }
 
-                EditorGUI.DrawRect(new Rect(0f, y + RowHeight - 1f, contentWidth, 1f), new Color(0f, 0f, 0f, 0.16f));
+                EditorGUI.DrawRect(new Rect(0f, y + rowHeight - 1f, contentWidth, 1f), new Color(0f, 0f, 0f, 0.16f));
             }
         }
 
@@ -178,9 +211,13 @@ namespace CSV4Unity.Editor
             }
 
             GUI.Label(
-                new Rect(rect.x + 5f, rect.y + 1f, Mathf.Max(0f, rect.width - 10f), rect.height - 2f),
+                new Rect(
+                    rect.x + (5f * _zoom),
+                    rect.y + _zoom,
+                    Mathf.Max(0f, rect.width - (10f * _zoom)),
+                    rect.height - (2f * _zoom)),
                 new GUIContent(text, text),
-                EditorStyles.label);
+                CellStyle);
             EditorGUI.DrawRect(new Rect(rect.x + rect.width - 1f, rect.y, 1f, rect.height), new Color(0f, 0f, 0f, 0.14f));
 
             Event current = Event.current;
@@ -266,7 +303,7 @@ namespace CSV4Unity.Editor
             }
             else if (current.type == EventType.MouseDrag && _resizingColumn == columnIndex)
             {
-                float delta = current.mousePosition.x - _resizeStartMouseX;
+                float delta = (current.mousePosition.x - _resizeStartMouseX) / _zoom;
                 _columnWidths[columnIndex] = Mathf.Max(MinimumColumnWidth, _resizeStartWidth + delta);
                 current.Use();
             }
@@ -319,9 +356,25 @@ namespace CSV4Unity.Editor
 
         private float CalculateContentWidth()
         {
-            float width = RowNumberWidth;
+            float width = BaseRowNumberWidth;
             for (int i = 0; i < _columnWidths.Length; i++) width += _columnWidths[i];
-            return width;
+            return width * _zoom;
+        }
+
+        private GUIStyle HeaderStyle => _headerStyle ??= CreateScaledStyle(EditorStyles.boldLabel, 12);
+
+        private GUIStyle CellStyle => _cellStyle ??= CreateScaledStyle(EditorStyles.label, 12);
+
+        private GUIStyle RowNumberStyle => _rowNumberStyle ??= CreateScaledStyle(EditorStyles.miniLabel, 10);
+
+        private GUIStyle CreateScaledStyle(GUIStyle source, int baseFontSize)
+        {
+            if (Mathf.Approximately(_zoom, 1f)) return source;
+
+            return new GUIStyle(source)
+            {
+                fontSize = Mathf.Max(1, Mathf.RoundToInt(baseFontSize * _zoom))
+            };
         }
 
         private static float[] CreateInitialColumnWidths(CsvDocument document)

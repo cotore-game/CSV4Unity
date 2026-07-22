@@ -1,6 +1,5 @@
 #if UNITY_EDITOR
 using System;
-using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -13,10 +12,13 @@ namespace CSV4Unity.Editor
     {
         private const float ToolbarHeight = 22f;
         private const float StatusHeight = 20f;
+        private const float MinimumZoom = 0.75f;
+        private const float MaximumZoom = 2f;
 
         [SerializeField] private TextAsset _csvAsset;
         [SerializeField] private bool _hasHeader = true;
         [SerializeField] private string _searchText = string.Empty;
+        [SerializeField] private float _zoom = 1f;
 
         [NonSerialized] private CsvViewerTable _table;
         [NonSerialized] private string _errorMessage;
@@ -28,7 +30,7 @@ namespace CSV4Unity.Editor
         {
             CsvViewerWindow window = GetWindow<CsvViewerWindow>();
             window.titleContent = new GUIContent("CSV Viewer");
-            window.minSize = new Vector2(480f, 260f);
+            window.minSize = new Vector2(640f, 260f);
             window.SetAsset(csvAsset);
             window.Show();
         }
@@ -38,7 +40,7 @@ namespace CSV4Unity.Editor
         {
             CsvViewerWindow window = GetWindow<CsvViewerWindow>();
             window.titleContent = new GUIContent("CSV Viewer");
-            window.minSize = new Vector2(480f, 260f);
+            window.minSize = new Vector2(640f, 260f);
             window.Show();
         }
 
@@ -53,13 +55,15 @@ namespace CSV4Unity.Editor
         {
             if (!(Selection.activeObject is TextAsset textAsset)) return false;
             string path = AssetDatabase.GetAssetPath(textAsset);
-            return string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase);
+            return CsvEditorAssetUtility.IsCsvPath(path);
         }
 
         private void OnEnable()
         {
             titleContent = new GUIContent("CSV Viewer");
-            minSize = new Vector2(480f, 260f);
+            minSize = new Vector2(640f, 260f);
+            if (_zoom <= 0f) _zoom = 1f;
+            _zoom = Mathf.Clamp(_zoom, MinimumZoom, MaximumZoom);
             EditorApplication.projectChanged += HandleProjectChanged;
             Reload();
         }
@@ -123,6 +127,23 @@ namespace CSV4Unity.Editor
             }
 
             if (GUILayout.Button("Reload", EditorStyles.toolbarButton, GUILayout.Width(54f))) Reload();
+
+            GUILayout.Space(6f);
+            GUILayout.Label("Zoom", EditorStyles.miniLabel, GUILayout.Width(34f));
+            EditorGUI.BeginChangeCheck();
+            float zoom = GUILayout.HorizontalSlider(
+                _zoom,
+                MinimumZoom,
+                MaximumZoom,
+                GUILayout.Width(82f));
+            if (EditorGUI.EndChangeCheck())
+            {
+                _zoom = Mathf.Round(zoom * 20f) / 20f;
+                _table?.SetZoom(_zoom);
+                Repaint();
+            }
+
+            GUILayout.Label($"{_zoom * 100f:0}%", EditorStyles.miniLabel, GUILayout.Width(34f));
 
             GUILayout.FlexibleSpace();
             EditorGUI.BeginChangeCheck();
@@ -193,7 +214,7 @@ namespace CSV4Unity.Editor
             }
 
             string assetPath = AssetDatabase.GetAssetPath(_csvAsset);
-            if (!string.Equals(Path.GetExtension(assetPath), ".csv", StringComparison.OrdinalIgnoreCase))
+            if (!CsvEditorAssetUtility.IsCsvPath(assetPath))
             {
                 _errorMessage = "The selected TextAsset is not a .csv file.";
                 Repaint();
@@ -211,6 +232,7 @@ namespace CSV4Unity.Editor
 
                 CsvDocument document = CSVLoader.LoadDocument(_csvAsset, options);
                 _table = new CsvViewerTable(document);
+                _table.SetZoom(_zoom);
                 _table.SetSearch(_searchText);
                 _assetHash = AssetDatabase.GetAssetDependencyHash(assetPath);
             }
