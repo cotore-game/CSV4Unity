@@ -1,6 +1,12 @@
 name: Docs
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "Assets/Plugins/CSVLoader/Runtime/**/*.cs"
+      - "docs/**"
+      - ".github/workflows/docs.yml"
   push:
     branches: [main, develop]
     paths:
@@ -11,8 +17,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: docs-${{ github.ref }}
@@ -54,8 +58,11 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
