@@ -1,10 +1,11 @@
 using CSV4Unity.Validation;
 
-namespace CSV4Unity.Fields
+namespace CSV4Unity.Examples
 {
     /// <summary>
     /// Scenario.csvの列をEnumで参照するためのスキーマです。
     /// </summary>
+    [CsvSchema]
     public enum ScenarioFields
     {
         [NotNull]

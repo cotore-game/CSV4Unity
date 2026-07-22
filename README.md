@@ -266,10 +266,32 @@ Viewerは画面に見える行だけを描画し、検索時もセル文字列�
 
 ## Inspector Validation
 
-1. `CSV4Unity.Fields` 名前空間へValidation用Enumを定義します。
+1. Validation用Enumへ `[CsvSchema]` を付けます。
 2. UnityのProjectウィンドウでCSVを選択します。
 3. Inspectorの `Validation Schema` からEnumを選択します。
 4. `Validate CSV` を実行します。
+
+```csharp
+using CSV4Unity;
+using CSV4Unity.Validation;
+
+namespace MyGame.Data
+{
+    [CsvSchema]
+    public enum ItemFields
+    {
+        [PrimaryKey]
+        Id,
+
+        [NotNull]
+        Name
+    }
+}
+```
+
+`CsvSchema`はUnity EditorがInspector候補を発見するための属性です。`WithFields<TField>()`や`CSVLoader.LoadTable<TField>()`をコードから使用するだけであれば必須ではありません。
+
+旧バージョンとの互換性のため、`CSV4Unity.Fields`名前空間のEnumも当面は候補へ表示されます。新しいスキーマでは名前空間規約を使用せず、`CsvSchema`を付けてください。
 
 ## Parser設定
 

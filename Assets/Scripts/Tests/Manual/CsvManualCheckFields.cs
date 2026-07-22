@@ -1,11 +1,12 @@
 using System.Text.RegularExpressions;
 using CSV4Unity.Validation;
 
-namespace CSV4Unity.Fields
+namespace CSV4Unity.Tests.Manual
 {
     /// <summary>
     /// Rfc4180.csvをEnumで読み込むための手動確認用スキーマです。
     /// </summary>
+    [CsvSchema]
     public enum Rfc4180Fields
     {
         Id,
@@ -16,6 +17,7 @@ namespace CSV4Unity.Fields
     /// <summary>
     /// HeaderMapping.csvのヘッダー補正を確認する手動確認用スキーマです。
     /// </summary>
+    [CsvSchema]
     public enum HeaderMappingFields
     {
         [CsvHeader("Item ID")]
@@ -31,6 +33,7 @@ namespace CSV4Unity.Fields
     /// <summary>
     /// ValidationInvalid.csvの制約検出に使用する手動確認用スキーマです。
     /// </summary>
+    [CsvSchema]
     public enum ManualValidationFields
     {
         [PrimaryKey]
@@ -48,6 +51,7 @@ namespace CSV4Unity.Fields
     /// <summary>
     /// ConditionalValidation.csvのCommand別Validationに使用する手動確認用スキーマです。
     /// </summary>
+    [CsvSchema]
     public enum ConditionalValidationFields
     {
         Command,

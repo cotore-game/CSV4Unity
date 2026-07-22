@@ -96,6 +96,7 @@ CsvRow / CsvColumn / CsvCell
 | 型 | 役割 |
 |---|---|
 | `CsvEnumSchema<TField>` | Enum値とCSV列番号を対応付ける |
+| `CsvSchemaAttribute` | EnumをUnity Inspectorのスキーマ候補として登録する |
 | `CsvHeaderAttribute` | Enum名と異なるヘッダー名を指定する |
 | `CsvHeaderPatternAttribute` | 複数表記を正規表現で一意に対応付ける |
 | `CsvTable<TField>` | `CsvDocument` とEnumスキーマを組み合わせる |
@@ -214,6 +215,14 @@ Validationは次の2種類へ分けます。
 `ConditionAttribute`は対象フィールドに付いたValidation属性の適用行を限定します。スキーマ生成時に条件列をEnumへ解決し、Reflectionは行評価中に実行しません。同じ`ConditionGroup`の条件はANDで評価され、Validation属性は同じ番号の条件グループだけを参照します。グループ0にConditionがなければ、従来どおり無条件で適用します。
 
 Validation属性は属性1個につき内部規則1個へ変換します。このため、同じ列へCommand別の`TypeConstraint`を複数定義できます。条件は制約を実行するかだけを決め、条件不成立自体をValidationエラーにはしません。
+
+### Unity Inspectorでのスキーマ発見
+
+`CsvSchemaAttribute`をEnumへ付けると、Unity Editorは`TypeCache`を使ってその型を発見し、CSV Inspectorの`Validation Schema`候補へ表示します。Enumを特定の名前空間へ置く必要はありません。
+
+この属性はEditor上の発見だけを担当します。Runtimeの`CsvDocument.WithFields<TField>()`や`CSVLoader.LoadTable<TField>()`は、属性がないEnumも従来どおり利用できます。
+
+v0.xでは互換性のため、`CSV4Unity.Fields`名前空間にある属性なしEnumも候補へ含めます。この名前空間規約は新規コードでは使用せず、明示的に`CsvSchemaAttribute`を付けます。
 
 `PrimaryKey` と `Unique` は条件に一致する行集合を一度だけ走査します。無条件の場合も、各行のセル検証中に列全体を繰り返し走査しません。
 

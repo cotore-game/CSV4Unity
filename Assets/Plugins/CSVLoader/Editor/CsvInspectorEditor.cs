@@ -17,7 +17,6 @@ namespace CSV4Unity.Editor
     [CustomEditor(typeof(TextAsset))]
     public sealed class CsvInspectorEditor : UnityEditor.Editor
     {
-        private const string FieldsNamespace = "CSV4Unity.Fields";
         private static readonly CsvSourceEncoding[] SourceEncodingValues =
         {
             CsvSourceEncoding.Auto,
@@ -118,7 +117,7 @@ namespace CSV4Unity.Editor
             if (_availableEnums.Count == 0)
             {
                 EditorGUILayout.HelpBox(
-                    $"{FieldsNamespace} 名前空間にEnumが見つかりません。",
+                    "CSVスキーマが見つかりません。Enumに[CsvSchema]を付けてください。",
                     MessageType.Info);
 
                 if (GUILayout.Button("Refresh Enums")) RefreshEnums();
@@ -415,13 +414,22 @@ namespace CSV4Unity.Editor
 
             int popupIndex = EditorGUILayout.Popup("Validation Schema", _selectedEnumIndex + 1, options);
             int enumIndex = popupIndex - 1;
-            if (enumIndex == _selectedEnumIndex) return;
+            if (enumIndex != _selectedEnumIndex)
+            {
+                _selectedEnumIndex = enumIndex;
+                _selectedEnumType = enumIndex >= 0 ? _availableEnums[enumIndex] : null;
+                _validationResult = null;
+                _showValidationResults = false;
+                SaveSelection();
+            }
 
-            _selectedEnumIndex = enumIndex;
-            _selectedEnumType = enumIndex >= 0 ? _availableEnums[enumIndex] : null;
-            _validationResult = null;
-            _showValidationResults = false;
-            SaveSelection();
+            if (_selectedEnumType != null && CsvSchemaTypeDiscovery.IsLegacySchema(_selectedEnumType))
+            {
+                EditorGUILayout.HelpBox(
+                    "このスキーマは旧CSV4Unity.Fields名前空間規約で検出されています。" +
+                    "Enumに[CsvSchema]を付けると、任意の名前空間へ配置できます。",
+                    MessageType.Info);
+            }
         }
 
         private void DrawConstraints(Type enumType)
@@ -656,38 +664,7 @@ namespace CSV4Unity.Editor
         private void RefreshEnums()
         {
             _availableEnums.Clear();
-
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int i = 0; i < assemblies.Length; i++)
-            {
-                foreach (Type type in GetLoadableTypes(assemblies[i]))
-                {
-                    if (type.IsEnum && type.Namespace != null &&
-                        type.Namespace.StartsWith(FieldsNamespace, StringComparison.Ordinal))
-                    {
-                        _availableEnums.Add(type);
-                    }
-                }
-            }
-
-            _availableEnums.Sort((left, right) =>
-                string.Compare(left.FullName, right.FullName, StringComparison.Ordinal));
-        }
-
-        private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
-        {
-            try
-            {
-                return assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException exception)
-            {
-                return exception.Types.Where(type => type != null);
-            }
-            catch
-            {
-                return Array.Empty<Type>();
-            }
+            _availableEnums.AddRange(CsvSchemaTypeDiscovery.FindAll());
         }
 
         private void RestoreSelection(string assetPath)
