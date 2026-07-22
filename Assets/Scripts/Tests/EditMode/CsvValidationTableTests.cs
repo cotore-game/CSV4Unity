@@ -357,6 +357,13 @@ namespace CSV4Unity.Tests
         }
 
         [Test]
+        public void DefaultSchema_UnknownComparison_ThrowsSchemaException()
+        {
+            Assert.Throws<CsvSchemaException>(() =>
+                Assert.That(CsvValidationSchema<InvalidCompareField>.Default, Is.Not.Null));
+        }
+
+        [Test]
         public void Validate_ForeignKey_UsesRegisteredReferenceTable()
         {
             CsvTable<ItemField> items = CsvParser.Parse("Id\nA\nB").WithFields<ItemField>();
