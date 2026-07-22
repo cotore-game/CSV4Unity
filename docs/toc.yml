@@ -1,7 +1,7 @@
 - name: Home
   href: index.md
 - name: APIリファレンス
-  href: api/
+  href: api/CSV4Unity.html
 - name: コア設計（日本語）
   href: ja/architecture.md
 - name: ベンチマーク（日本語）

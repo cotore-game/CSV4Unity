@@ -17,20 +17,22 @@ CSV4Unity reads CSV text into row, column, and cell views for Unity. Values rema
 
 - RFC 4180 quoted fields, escaped quotes, commas, and embedded line breaks
 - Enum-based column access
+- Exact, case-insensitive, alias, and regular-expression header mapping
 - Header-name and column-index access
 - Row and column views over one document
 - Explicit cell conversion
 - Explicitly created search indices
-- Attribute-based validation
-- Unity Inspector validation
-- Read-only CSV Viewer
+- Attribute-based and conditional row validation
+- Unity Inspector validation with explicit `[CsvSchema]` discovery
+- Source-encoding inspection and manual UTF-8 conversion
+- Read-only CSV Viewer with search, copying, column resizing, and zoom
 
 ## Installation
 
 Add this URL through Unity Package Manager:
 
 ```text
-https://github.com/cotore-game/CSV4Unity.git?path=/Assets/Plugins/CSVLoader#v0.2.0
+https://github.com/cotore-game/CSV4Unity.git?path=/Assets/Plugins/CSVLoader#v0.3.0
 ```
 
 ## Basic usage
@@ -53,6 +55,19 @@ Use `CsvDocument` when an Enum schema is unnecessary:
 ```csharp
 CsvDocument document = CSVLoader.LoadDocument(csvAsset);
 string name = document.Row(0)["Name"].GetString();
+```
+
+Use `CsvHeader` when an Enum field and CSV header have different names. Use `CsvHeaderPattern` only when one field must accept multiple spellings.
+
+```csharp
+public enum ItemField
+{
+    [CsvHeader("Item ID")]
+    Id,
+
+    [CsvHeader("DISPLAY NAME", IgnoreCase = true)]
+    DisplayName
+}
 ```
 
 ## Validation
@@ -91,11 +106,35 @@ public enum ScenarioField
 
 The default group is zero. Supported comparisons are `Equal`, `NotEqual`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`, `IsEmpty`, `IsNotEmpty`, `In`, and `NotIn`. Groups are declarative and have no `if / else` execution order.
 
+## CSV Encoding
+
+Runtime loading expects UTF-8 CSV data. The CSV Inspector detects UTF-8, Shift_JIS, UTF-16, and UTF-32 source files and provides a confirmed manual conversion to UTF-8 without a BOM. Conversion stores the original bytes in the project's `Library` folder so the previous file can be restored. Importing an asset never rewrites it automatically.
+
+## Inspector Validation
+
+Add `[CsvSchema]` to an Enum to make it available in the CSV Inspector without requiring a specific namespace.
+
+```csharp
+[CsvSchema]
+public enum ItemField
+{
+    [PrimaryKey]
+    Id,
+
+    [NotNull]
+    Name
+}
+```
+
+`CsvSchema` is only used for Editor discovery. Runtime APIs such as `WithFields<TField>()` and `CSVLoader.LoadTable<TField>()` do not require it.
+
 ## CSV Viewer
 
 Select a CSV asset and click `Open CSV Viewer` in the Inspector. The viewer is also available from `Assets > Open in CSV Viewer` and `Window > CSV4Unity > CSV Viewer`.
 
-The read-only table supports headerless files, case-insensitive search, resizable columns, cell or row copying, and automatic reload after asset changes. It virtualizes row drawing and uses the same parser as the Runtime API.
+The read-only table supports headerless files, case-insensitive search, 75-200% zoom, resizable columns, cell or row copying, and automatic reload after asset changes. It virtualizes row drawing and uses the same parser as the Runtime API.
+
+CSV-only controls appear only for `.csv` TextAssets. Raw CSV text is not duplicated in the Inspector because the table viewer provides the readable representation. Other TextAssets continue to use Unity's built-in Inspector.
 
 The Japanese README is the canonical user documentation while the API is being stabilized. See [the architecture document](./docs/en/architecture.md) for the current class boundaries.
 
