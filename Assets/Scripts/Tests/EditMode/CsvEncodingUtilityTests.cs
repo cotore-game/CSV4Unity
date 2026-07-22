@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Text;
 using CSV4Unity.Editor;
 using NUnit.Framework;
@@ -104,6 +106,54 @@ namespace CSV4Unity.Tests
             Assert.That(result.ErrorMessage, Is.Not.Empty);
         }
 
+        [Test]
+        public void CreateBackup_ExistingBackupIsNotOverwritten()
+        {
+            string directory = CreateTemporaryDirectory();
+            string backupPath = Path.Combine(directory, "source.bytes");
+            byte[] original = { 1, 2, 3 };
+
+            try
+            {
+                bool created = CsvEncodingBackupUtility.CreateIfMissing(backupPath, original);
+                bool createdAgain = CsvEncodingBackupUtility.CreateIfMissing(
+                    backupPath,
+                    new byte[] { 9, 9, 9 });
+
+                Assert.That(created, Is.True);
+                Assert.That(createdAgain, Is.False);
+                Assert.That(File.ReadAllBytes(backupPath), Is.EqualTo(original));
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Test]
+        public void RestoreBackup_ReplacesTargetAndConsumesBackup()
+        {
+            string directory = CreateTemporaryDirectory();
+            string backupPath = Path.Combine(directory, "source.bytes");
+            string targetPath = Path.Combine(directory, "target.csv");
+            byte[] original = { 1, 2, 3 };
+
+            try
+            {
+                CsvEncodingBackupUtility.CreateIfMissing(backupPath, original);
+                File.WriteAllBytes(targetPath, new byte[] { 9, 9, 9 });
+
+                CsvEncodingBackupUtility.Restore(backupPath, targetPath);
+
+                Assert.That(File.ReadAllBytes(targetPath), Is.EqualTo(original));
+                Assert.That(File.Exists(backupPath), Is.False);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
         private static byte[] Combine(byte[] first, byte[] second)
         {
             var result = new byte[first.Length + second.Length];
@@ -118,6 +168,13 @@ namespace CSV4Unity.Tests
                    bytes[0] == 0xEF &&
                    bytes[1] == 0xBB &&
                    bytes[2] == 0xBF;
+        }
+
+        private static string CreateTemporaryDirectory()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "CSV4Unity-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(path);
+            return path;
         }
     }
 }
