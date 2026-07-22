@@ -135,7 +135,6 @@ The viewer treats `CsvDocument` as read-only data. It caches display strings for
 
 - Row-local: required, type, range, regex, allowed values, length.
 - Column/table: primary key and unique.
-- Cross-document: foreign key through an explicit validation context.
 
 `ConditionAttribute` limits a validation rule to matching rows. Conditions in the same `ConditionGroup` are combined with AND. Enum fields and groups are resolved while creating the validation schema, so row evaluation performs no reflection. Each validation attribute becomes one internal rule, allowing one CSV column to use different type constraints for different commands.
 

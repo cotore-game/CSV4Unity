@@ -18,7 +18,6 @@ namespace CSV4Unity.Validation
         /// <param name="validationSchema">
         /// 使用するValidationスキーマ。<see langword="null"/>の場合は<see cref="CsvValidationSchema{TField}.Default"/>を使用します。
         /// </param>
-        /// <param name="context">ForeignKeyの参照先テーブル。参照先が同じテーブルだけの場合は<see langword="null"/>にできます。</param>
         /// <param name="formatProvider">型変換、数値比較、数値範囲検証に使用する形式。<see langword="null"/>の場合は<see cref="CultureInfo.InvariantCulture"/>を使用します。</param>
         /// <returns>すべてのエラーとWarningを格納したValidation結果。</returns>
         /// <exception cref="ArgumentNullException"><paramref name="table"/>が<see langword="null"/>です。</exception>
@@ -29,7 +28,6 @@ namespace CSV4Unity.Validation
         public static CsvValidationResult Validate<TField>(
             CsvTable<TField> table,
             CsvValidationSchema<TField> validationSchema = null,
-            CsvValidationContext context = null,
             IFormatProvider formatProvider = null)
             where TField : struct, Enum
         {
@@ -42,7 +40,7 @@ namespace CSV4Unity.Validation
             IReadOnlyList<CsvFieldValidationRule<TField>> rules = schema.Rules;
             for (int i = 0; i < rules.Count; i++)
             {
-                ValidateRule(table, rules[i], context, provider, result);
+                ValidateRule(table, rules[i], provider, result);
             }
 
             return result;
@@ -51,7 +49,6 @@ namespace CSV4Unity.Validation
         private static void ValidateRule<TField>(
             CsvTable<TField> table,
             CsvFieldValidationRule<TField> rule,
-            CsvValidationContext context,
             IFormatProvider formatProvider,
             CsvValidationResult result)
             where TField : struct, Enum
@@ -70,10 +67,6 @@ namespace CSV4Unity.Validation
                 return;
             }
 
-            HashSet<string> referenceValues = rule.Kind == CsvValidationRuleKind.ForeignKey
-                ? PrepareForeignKeyValues(table, rule, context, result)
-                : null;
-
             for (int rowIndex = 0; rowIndex < column.Count; rowIndex++)
             {
                 if (!CsvConditionEvaluator.Matches(table, rowIndex, rule.Conditions, formatProvider)) continue;
@@ -90,7 +83,7 @@ namespace CSV4Unity.Validation
                 }
 
                 if (cell.IsEmpty) continue;
-                ValidateCell(cell, rowIndex, rule, formatProvider, referenceValues, result);
+                ValidateCell(cell, rowIndex, rule, formatProvider, result);
             }
         }
 
@@ -99,7 +92,6 @@ namespace CSV4Unity.Validation
             int rowIndex,
             CsvFieldValidationRule<TField> rule,
             IFormatProvider formatProvider,
-            HashSet<string> referenceValues,
             CsvValidationResult result)
             where TField : struct, Enum
         {
@@ -184,17 +176,6 @@ namespace CSV4Unity.Validation
                     break;
                 }
 
-                case CsvValidationRuleKind.ForeignKey:
-                    if (referenceValues != null)
-                    {
-                        string text = cell.GetString();
-                        if (!referenceValues.Contains(text))
-                        {
-                            result.AddError(rowIndex, rule.FieldName, $"Referenced value '{text}' was not found.");
-                        }
-                    }
-
-                    break;
             }
         }
 
@@ -233,43 +214,5 @@ namespace CSV4Unity.Validation
             }
         }
 
-        private static HashSet<string> PrepareForeignKeyValues<TField>(
-            CsvTable<TField> table,
-            CsvFieldValidationRule<TField> rule,
-            CsvValidationContext context,
-            CsvValidationResult result)
-            where TField : struct, Enum
-        {
-            CsvColumn referenceColumn;
-            if (rule.ForeignKey.ReferenceEnumType == typeof(TField))
-            {
-                try
-                {
-                    referenceColumn = table.Document.Column(rule.ForeignKey.ReferenceField);
-                }
-                catch (KeyNotFoundException)
-                {
-                    result.AddWarning(-1, rule.FieldName, "Foreign key reference column was not found.");
-                    return null;
-                }
-            }
-            else if (context == null || !context.TryGetColumn(
-                         rule.ForeignKey.ReferenceEnumType,
-                         rule.ForeignKey.ReferenceField,
-                         out referenceColumn))
-            {
-                result.AddWarning(-1, rule.FieldName, "Foreign key reference table is not registered.");
-                return null;
-            }
-
-            var values = new HashSet<string>(StringComparer.Ordinal);
-            for (int rowIndex = 0; rowIndex < referenceColumn.Count; rowIndex++)
-            {
-                CsvCell cell = referenceColumn[rowIndex];
-                if (!cell.IsEmpty) values.Add(cell.GetString());
-            }
-
-            return values;
-        }
     }
 }

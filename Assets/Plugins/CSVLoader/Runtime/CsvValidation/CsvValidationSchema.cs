@@ -262,10 +262,6 @@ namespace CSV4Unity.Validation
                     rule.Kind = CsvValidationRuleKind.MaxLength;
                     rule.MaxLength = maxLength.MaxLength;
                     break;
-                case ForeignKeyAttribute foreignKey:
-                    rule.Kind = CsvValidationRuleKind.ForeignKey;
-                    rule.ForeignKey = foreignKey;
-                    break;
                 default:
                     throw new CsvSchemaException(
                         $"Unsupported validation attribute '{validation.GetType().FullName}'.");
@@ -296,8 +292,7 @@ namespace CSV4Unity.Validation
         Regex,
         AllowedValues,
         MinLength,
-        MaxLength,
-        ForeignKey
+        MaxLength
     }
 
     internal sealed class CsvFieldValidationRule<TField> where TField : struct, Enum
@@ -314,7 +309,6 @@ namespace CSV4Unity.Validation
         public HashSet<string> AllowedValues { get; set; }
         public int MinLength { get; set; }
         public int MaxLength { get; set; }
-        public ForeignKeyAttribute ForeignKey { get; set; }
         public bool SuppressRequiredError { get; set; }
         public bool SuppressNumericError { get; set; }
     }

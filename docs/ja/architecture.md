@@ -199,16 +199,14 @@ if (index.TryFindFirst("Text", out int rowIndex))
 | `CsvValidationSchema<TField>` | Enum属性を一度読み取り、検証規則へ変換する |
 | `CsvConditionEvaluator` | コンパイル済みConditionを行ごとに評価する内部クラス |
 | `CsvValidator` | `CsvTable<TField>` を規則に従って検証する |
-| `CsvValidationContext` | 外部キー検証で参照先CSVを登録する |
 | `CsvValidationResult` | エラーと警告を保持する |
 
-Validationは次の3種類へ分けます。
+Validationは次の2種類へ分けます。
 
 | 種類 | 制約 |
 |---|---|
 | セル・行単位 | `NotNull`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、文字列長 |
 | 列全体 | `PrimaryKey`、`Unique` |
-| CSV間 | `ForeignKey` |
 
 `ConditionAttribute`は対象フィールドに付いたValidation属性の適用行を限定します。スキーマ生成時に条件列をEnumへ解決し、Reflectionは行評価中に実行しません。同じ`ConditionGroup`の条件はANDで評価され、Validation属性は同じ番号の条件グループだけを参照します。グループ0にConditionがなければ、従来どおり無条件で適用します。
 
