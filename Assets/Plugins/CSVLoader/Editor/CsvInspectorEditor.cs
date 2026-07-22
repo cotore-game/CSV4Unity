@@ -314,8 +314,6 @@ namespace CSV4Unity.Editor
                     return $"[MinLength: {minLength.MinLength}]";
                 case MaxLengthAttribute maxLength:
                     return $"[MaxLength: {maxLength.MaxLength}]";
-                case ForeignKeyAttribute foreignKey:
-                    return $"[ForeignKey: {foreignKey.ReferenceEnumType.Name}.{foreignKey.ReferenceField}]";
                 default:
                     return null;
             }

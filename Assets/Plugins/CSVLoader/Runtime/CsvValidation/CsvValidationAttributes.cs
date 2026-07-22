@@ -114,34 +114,6 @@ namespace CSV4Unity.Validation
     }
 
     /// <summary>
-    /// セル文字列が参照先テーブルの指定列に存在することを要求します。
-    /// </summary>
-    /// <remarks>
-    /// 同じEnum型を指定した場合は検証対象テーブル内を参照します。別のEnum型を指定する場合は、
-    /// <see cref="CsvValidationContext.Register{TField}(CsvTable{TField})"/>で参照先を登録します。
-    /// </remarks>
-    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-    public class ForeignKeyAttribute : Attribute
-    {
-        /// <summary>参照先テーブルを識別するEnum型を取得します。</summary>
-        public Type ReferenceEnumType { get; }
-
-        /// <summary>参照先のヘッダー名を取得します。</summary>
-        public string ReferenceField { get; }
-
-        /// <summary>
-        /// 外部キー制約を設定します。
-        /// </summary>
-        /// <param name="referenceEnumType">参照先テーブルを識別するEnum型。</param>
-        /// <param name="referenceField">参照先のヘッダー名。</param>
-        public ForeignKeyAttribute(Type referenceEnumType, string referenceField)
-        {
-            ReferenceEnumType = referenceEnumType;
-            ReferenceField = referenceField;
-        }
-    }
-
-    /// <summary>
     /// セル文字列が指定した最小長以上であることを要求します。
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
