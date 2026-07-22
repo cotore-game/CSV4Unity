@@ -257,12 +257,15 @@ CSV4Unityはインポート時にファイルを自動変換しません。変�
 ProjectウィンドウでCSVを選択し、Inspectorの `Open CSV Viewer` を押すと、CSVを読み取り専用の表として確認できます。CSVを右クリックして `Open in CSV Viewer` を選ぶか、`Window > CSV4Unity > CSV Viewer` から開くこともできます。
 
 - `Header` で先頭行をヘッダーとして扱うか切り替え
+- `Zoom` で表を75%から200%まで拡大・縮小
 - 検索欄で全セルを大文字小文字を区別せず絞り込み
 - ヘッダー境界のドラッグで列幅を変更
 - セルの右クリックでセルまたは行をコピー
 - CSVアセット更新時に自動再読込
 
 Viewerは画面に見える行だけを描画し、検索時もセル文字列の全コピーを作りません。CSVの編集や保存は行わず、表示にはRuntimeと同じParserを使用します。
+
+CSV用の追加UIは`.csv`のTextAssetにだけ表示されます。CSV本文のテキストプレビューはInspectorへ重複表示せず、表形式のViewerから確認します。`.txt`や`.json`など、それ以外のTextAssetはUnity標準Inspectorで表示します。
 
 ## Inspector Validation
 

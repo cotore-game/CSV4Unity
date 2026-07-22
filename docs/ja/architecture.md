@@ -152,12 +152,14 @@ public enum ItemField
 
 | 型 | 役割 |
 |---|---|
-| `CsvInspectorEditor` | CSVの文字コード確認・UTF-8変換と、Viewer・Validationの入口を提供する |
+| `CsvInspectorEditor` | Unity標準TextAsset InspectorへCSV専用の文字コード変換・Viewer・Validationを追加する |
 | `CsvEncodingUtility` | 元バイト列の文字コードを検査し、明示された文字コードからUTF-8へ変換する |
 | `CsvViewerWindow` | CSVアセットの選択、解析、検索条件、再読込を管理する |
-| `CsvViewerTable` | 表示範囲の行だけを描画し、列幅変更とコピー操作を提供する |
+| `CsvViewerTable` | 表示範囲の行だけを描画し、75〜200%の拡大率、列幅変更、コピー操作を提供する |
 
-ViewerはEditor専用であり、`CsvDocument`を読み取り専用データとして利用します。表示用文字列は最大256行分だけキャッシュし、CSV全体を表示専用の二次元文字列配列へ複製しません。編集や書き出しは別の責務とします。
+ViewerはEditor専用であり、`CsvDocument`を読み取り専用データとして利用します。表示用文字列は最大256行分だけキャッシュし、CSV全体を表示専用の二次元文字列配列へ複製しません。編集や書き出しは別の責務とします。拡大率は描画時の行高・列幅・文字サイズへ適用し、CSVデータやキャッシュ内容は複製しません。
+
+Unityの`CustomEditor`はファイル拡張子で対象を限定できないため、`CsvInspectorEditor`はCSV以外ではUnity標準のTextAsset Inspectorへ表示を委譲します。CSVでは本文のテキストプレビューを省略し、表形式のViewerを入口にします。CSV用UIは拡張子が`.csv`のアセットにだけ追加します。
 
 文字コード検査はUnityが生成した`TextAsset.text`ではなく、プロジェクト内の元CSVファイルをバイト列として読み取ります。BOMを優先し、BOMなしは厳密なUTF-8、次にShift_JIS（CP932）として検査します。誤判定時はInspectorで変換元を指定できます。ファイルの自動書き換えは行わず、確認ダイアログを伴う手動操作だけでUTF-8（BOMなし）へ変換します。
 
