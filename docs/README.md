@@ -1,61 +1,68 @@
-# CSV4Unity 開発ドキュメント
+# Development documentation
 
-CSV4Unityを開発・保守する人向けの資料です。
+For installation and usage, start with the [README](../README.md) or the [user guide](en/guide.md). This page covers development and maintenance.
 
-- [日本語: コア設計](ja/architecture.md)
-- [日本語: ベンチマーク](ja/benchmark.md)
-- [English: Core architecture](en/architecture.md)
+## Contents
 
-現時点では日本語版を正本として更新します。英語版は設計が安定した段階で追従させます。
+- [Repository layout](#repository-layout)
+- [Language policy](#language-policy)
+- [Tests and CI](#tests-and-ci)
+- [Build the API site](#build-the-api-site)
 
-## 言語方針
+## Repository layout
 
-- 公開APIの識別子は英語で命名します。
-- 公開APIのXMLドキュメントコメントは日本語を正本とします。
-- 実装意図を補足する通常コメントも、必要な場所に日本語で記載します。
-- 英語版APIドキュメントは、仕様が安定してから別のDocFXサイトまたは翻訳用ファイルとして整備します。
-- 長い使用例はXMLコメントへ重複させず、READMEや手書きガイドへ記載します。
+| Path | Purpose |
+|---|---|
+| `Assets/Plugins/CSVLoader/Runtime` | Runtime API and CSV core |
+| `Assets/Plugins/CSVLoader/Editor` | Inspector, encoding tools, and Viewer |
+| `Assets/Scripts/Examples` | Usage examples |
+| `Assets/Scripts/Tests/EditMode` | Automated development tests |
+| `Assets/Scripts/Tests/Manual` | Manual checks |
+| `Assets/TestData/CSV4Unity` | CSV fixtures |
+| `docs/en`, `docs/ja` | User guides and architecture notes |
 
-DocFX専用ビルドでは、公開APIのXMLコメント欠落、引数タグの不一致、不正なXMLおよび`cref`をコンパイルエラーとして扱います。
+Only `Assets/Plugins/CSVLoader` is installed by the UPM Git URL. Development tests and fixtures are not included in that package.
 
-## APIリファレンス
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the contribution process and [core architecture](en/architecture.md) for design boundaries.
 
-公開APIのリファレンスは、RuntimeコードのXMLドキュメントコメントからDocFXで生成します。
+## Language policy
 
-- 設定: `docs/docfx.json`
-- 解析用プロジェクト: `docs/CSV4Unity.Docs.csproj`
-- GitHub Actions: `.github/workflows/docs.yml`
-- 公開先: <https://cotore-game.github.io/CSV4Unity/>
+- English is the main README and documentation entry language; Japanese pages are linked separately.
+- Public API identifiers, code examples, comments inside examples, and sample values use English.
+- Public API XML comments remain in Japanese for now. This README reorganization does not translate Runtime source comments.
+- Keep existing implementation comment conventions. Place long examples in the user guides instead of duplicating them in XML comments.
 
-GitHubでは`main`または`develop`へのpush時にDocFXをビルドし、`main`だけをGitHub Pagesへデプロイします。作業ブランチとPull Requestでは実行しません。リポジトリのSettingsから、PagesのSourceを `GitHub Actions` に設定する必要があります。
+The DocFX-specific project treats missing public XML comments, invalid parameter tags, malformed XML, and invalid `cref` references as build errors.
 
-## Unityテスト
+## Tests and CI
 
-`.github/workflows/unity-tests.yml`は、`main`へのpush時にEditModeテストを実行します。作業ブランチとPull Requestでは実行しません。
+Run EditMode tests using **Window > General > Test Runner** in Unity **6000.0.73f1**.
 
-GameCIでPersonal Licenseを使用するため、Repository Secretsへ次の値を設定します。
+- `.github/workflows/unity-tests.yml` runs on every PR targeting `main`, relevant file pushes to `main`, and manual dispatch. `EditMode tests` is required for merging.
+- `.github/workflows/docs.yml` builds on relevant file PRs targeting `main`, relevant file pushes to `main` or `develop`, and manual dispatch. Deployment runs only on pushes to `main`.
+- Documentation builds use .NET 8 and DocFX 2.78.5 in the configured Unity container.
 
-- `UNITY_LICENSE`: Unity Personal Licenseファイル（`.ulf`）の全文
-- `UNITY_EMAIL`
-- `UNITY_PASSWORD`
+Maintainers configure the Unity test job with `UNITY_LICENSE` or `UNITY_SERIAL`, plus `UNITY_EMAIL` and `UNITY_PASSWORD`, in repository secrets. See the [GameCI activation instructions](https://game.ci/docs/github/activation/). Never commit these values. Fork PRs cannot access upstream secrets and need maintainer assistance for licensed test execution.
 
-ライセンスファイルの取得方法は、[GameCI公式のActivation手順](https://game.ci/docs/github/activation/)を参照してください。これらのSecretが未設定の場合、Unity Editorを起動できないためテストは失敗します。
+The workflow uploads available test XML and Editor logs as `unity-editmode-test-results`, including on failure. Missing output is reported as a warning rather than masking the original failure.
 
-Unityがテスト出力を生成した場合は、失敗時もXML結果とEditorログを`unity-editmode-test-results` Artifactとして保存します。ライセンスエラーなどで出力自体が作られなかった場合、Artifactのアップロードは警告だけを残してスキップします。
+## Build the API site
 
-### ローカル生成
-
-.NET SDK 8.0以降とDocFX 2.78.5を用意し、Unity 6000.0.73f1のインストール先を指定して実行します。
+Install .NET SDK 8.0 or later and DocFX 2.78.5. With Unity 6000.0.73f1 installed at the default location, run from the repository root:
 
 ```powershell
 dotnet tool install --global docfx --version 2.78.5
 ./docs/build.ps1
 ```
 
-Unityを標準以外の場所へインストールしている場合は、`Editor/Data`を指定します。
+For a custom Unity installation, specify the `Editor/Data` directory:
 
 ```powershell
-./docs/build.ps1 -UnityEditorContents "D:\Unity\6000.0.73f1\Editor\Data"
+./docs/build.ps1 -UnityEditorContents "D:/Unity/6000.0.73f1/Editor/Data"
 ```
 
-生成物は `docs/_site/` に出力され、Git管理対象には含まれません。
+Configuration is in `docs/docfx.json`; `docs/CSV4Unity.Docs.csproj` exposes Runtime sources to DocFX. Generated metadata in `docs/api/` and HTML in `docs/_site/` are ignored by Git. Do not commit generated pages.
+
+The published API is at [GitHub Pages](https://cotore-game.github.io/CSV4Unity/api/CSV4Unity.html). Markdown pages read directly on GitHub must link there, rather than to an untracked `docs/api/*.html` file. The DocFX `toc.yml` uses a relative HTML path within the generated site.
+
+Repository Pages settings must use **GitHub Actions** as the source for deployment.
