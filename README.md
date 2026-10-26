@@ -1,70 +1,60 @@
-> English overview: [README_EN.md](./README_EN.md)
-
 # CSV4Unity
 
-CSV4Unityは、Unityの `TextAsset` またはCSV文字列を読み取り、行・列・セルのどの方向からでも参照できるCSVライブラリです。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.3.0-brightgreen)](https://github.com/cotore-game/CSV4Unity/releases/tag/v0.3.0)
+[![Unity Tests](https://github.com/cotore-game/CSV4Unity/actions/workflows/unity-tests.yml/badge.svg?branch=main)](https://github.com/cotore-game/CSV4Unity/actions/workflows/unity-tests.yml)
 
-CSVをクラスへ一括変換せず、セルを必要なときに指定した型へ変換します。そのため、ADVシナリオの `Arg1` のように、行ごとに文字列・整数・真偽値などが混在する列も扱えます。
+CSV tooling for Unity with enum-based column access, conditional validation, and an Editor viewer.
+
+Read CSV data without mapping every row to a class. Values stay as text until you request a type, so scenario commands can use the same argument column for strings, numbers, or booleans on different rows.
+
+[日本語](README_JA.md)
 
 > [!IMPORTANT]
-> 現在は1.0未満の再設計中です。APIは今後も変更される可能性があります。利用時はGitのタグまたはコミットを固定してください。
+> CSV4Unity is pre-1.0. APIs may change between releases. Pin a release tag or commit when installing.
 
-## ドキュメント
+## Contents
 
-- [APIリファレンス](https://cotore-game.github.io/CSV4Unity/)
-- [コア設計（日本語）](./docs/ja/architecture.md)
-- [Core architecture (English)](./docs/en/architecture.md)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Features](#features)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
 
-## 主な機能
+## Installation
 
-- RFC 4180形式のクォート、カンマ、二重引用符、クォート内改行を解析
-- Enumによる列指定
-- 属性によるEnum名とCSVヘッダー名の補正
-- ヘッダー名・列番号による非ジェネリックアクセス
-- 行アクセスと列アクセス
-- 必要なセルだけを明示的に型変換
-- 検索用インデックスの明示生成
-- Enum属性によるValidation
-- CSV Inspectorからの手動Validation
-- CSV Inspectorでの文字コード検査とUTF-8変換
-- 読み取り専用CSV Viewer
-
-## インストール
-
-Unity Package Managerの `Add package from git URL...` に次のURLを指定します。
+In Unity Package Manager, select **Add package from git URL...** and enter:
 
 ```text
 https://github.com/cotore-game/CSV4Unity.git?path=/Assets/Plugins/CSVLoader#v0.3.0
 ```
 
-安定した利用には、リリースタグまたはコミットを固定したURLを使用してください。
+The package declares Unity 6000.0 or later. Development and tests use Unity **6000.0.73f1**.
 
-## Enumで列を指定する
+## Quick start
 
-CSVヘッダーと同じ名前のEnumを定義します。
-
-```csharp
-public enum ScenarioField
-{
-    Command,
-    Arg1,
-    Arg2,
-    Text
-}
-```
+Save this as a UTF-8 CSV file in your Unity project's Assets folder:
 
 ```csv
-Command,Arg1,Arg2,Text
-Bg,room,0.5,
-Wait,500,,
-Text,,,こんにちは
+Command,Arg1,Text
+Wait,500,
+SetFlag,true,
+Text,,Hello!
 ```
 
-`LoadTable<TField>` で読み込むと、列名を文字列で記述せずにアクセスできます。
+Define an enum matching the headers and assign the CSV asset in the Inspector:
 
 ```csharp
 using CSV4Unity;
 using UnityEngine;
+
+public enum ScenarioField
+{
+    Command,
+    Arg1,
+    Text
+}
 
 public sealed class ScenarioReader : MonoBehaviour
 {
@@ -73,250 +63,38 @@ public sealed class ScenarioReader : MonoBehaviour
     private void Start()
     {
         CsvTable<ScenarioField> table = CSVLoader.LoadTable<ScenarioField>(scenarioCsv);
-
-        string command = table.Row(0)[ScenarioField.Command].GetString();
-        float duration = table.Row(0)[ScenarioField.Arg2].Get<float>();
-        int milliseconds = table.Row(1)[ScenarioField.Arg1].Get<int>();
+        int milliseconds = table.Row(0)[ScenarioField.Arg1].Get<int>();
+        bool enabled = table.Row(1)[ScenarioField.Arg1].Get<bool>();
+        string text = table.Row(2)[ScenarioField.Text].GetString();
+        Debug.Log($"Wait: {milliseconds}, flag: {enabled}, text: {text}");
     }
 }
 ```
 
-同じ `Arg1` 列でも、行のCommandに応じて異なる型として取得できます。
+Row indices start at zero and exclude the header. Enum access checks column names; cell values are converted at runtime. Use `CSVLoader.LoadDocument` for header-name or column-index access without an enum.
 
-```csharp
-string background = table.Row(0)[ScenarioField.Arg1].GetString();
-int milliseconds = table.Row(1)[ScenarioField.Arg1].Get<int>();
-```
+## Features
 
-### Enum名と異なるヘッダーを使う
+- **CSV parsing:** RFC 4180 quoting, escaped quotes, commas, and embedded line breaks.
+- **Flexible access:** row, column, and cell views; enum fields, header names, or column indices; header aliases and patterns.
+- **Explicit conversion and indexing:** convert cells when needed and build search indices for repeated lookups.
+- **Validation:** enum attributes for required values, uniqueness, types, ranges, and more; conditions apply rules to matching rows.
+- **Unity Editor tools:** schema discovery with `[CsvSchema]`, manual validation, encoding inspection, UTF-8 conversion with restore support, and a read-only viewer with search and zoom.
 
-通常の別名には `CsvHeader` を使用します。`IgnoreCase` を有効にすると、大文字小文字を区別しません。
+Loading and validation are separate operations. CSV editing and cross-file foreign-key validation are not currently supported.
 
-```csharp
-public enum ItemField
-{
-    [CsvHeader("Item ID")]
-    Id,
+## Documentation
 
-    [CsvHeader("DISPLAY NAME", IgnoreCase = true)]
-    DisplayName
-}
-```
+- [User guide](docs/en/guide.md) — access, validation, encoding, and Editor tools.
+- [API reference](https://cotore-game.github.io/CSV4Unity/api/CSV4Unity.html) — generated from Runtime XML comments, currently in Japanese.
+- [Core architecture](docs/en/architecture.md) — contributor notes on ownership and class boundaries.
+- [Development documentation](docs/README.md) — repository layout, tests, and documentation builds.
+- [Release notes](https://github.com/cotore-game/CSV4Unity/releases).
 
-複数の表記を許可する必要がある場合だけ `CsvHeaderPattern` を使用します。正規表現はヘッダー名全体へ適用されます。
+## Contributing
 
-```csharp
-using System.Text.RegularExpressions;
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and the contribution process.
 
-public enum ItemField
-{
-    [CsvHeaderPattern(@"item[_\s-]?id", RegexOptions.IgnoreCase)]
-    Id
-}
-```
+## License
 
-属性を指定しないフィールドは、従来どおりEnum名とヘッダー名を大文字小文字まで含めて比較します。候補が0件または複数件の場合や、複数のEnumフィールドが同じ列へ対応した場合は `CsvSchemaException` が送出されます。
-
-## ヘッダー名・列番号で読む
-
-Enumが不要な場合は `CsvDocument` を使用します。
-
-```csharp
-CsvDocument document = CSVLoader.LoadDocument(csvAsset);
-
-string name = document.Row(0)["Name"].GetString();
-int level = document.Column("Level")[0].Get<int>();
-```
-
-ヘッダーなしCSVは列番号で参照します。
-
-```csharp
-var options = new CsvParseOptions { HasHeader = false };
-CsvDocument document = CSVLoader.LoadDocument("Wait,500\nText,Hello", options);
-
-string command = document.Row(0)[0].GetString();
-int argument = document.Row(0)[1].Get<int>();
-```
-
-## 列アクセスと検索
-
-```csharp
-CsvColumn<ScenarioField> commands = table.Column(ScenarioField.Command);
-
-for (int rowIndex = 0; rowIndex < commands.Count; rowIndex++)
-{
-    Debug.Log(commands[rowIndex].GetString());
-}
-```
-
-同じ列を繰り返し検索する場合だけ、明示的にインデックスを作成します。
-
-```csharp
-CsvIndex<string> index = CsvIndex<string>.Create(commands);
-
-if (index.TryFindFirst("Text", out int rowIndex))
-{
-    CsvRow<ScenarioField> row = table.Row(rowIndex);
-}
-```
-
-## Validation
-
-Enumフィールドへ制約属性を付けます。
-
-```csharp
-using CSV4Unity.Validation;
-
-public enum CharacterField
-{
-    [PrimaryKey]
-    [TypeConstraint(typeof(int))]
-    Id,
-
-    [NotNull]
-    [MaxLength(32)]
-    Name,
-
-    [Range(1, 100)]
-    Level
-}
-```
-
-読み込みとValidationは分離されています。必要な場所で明示的に実行してください。
-
-```csharp
-CsvTable<CharacterField> table = CSVLoader.LoadTable<CharacterField>(csvAsset);
-CsvValidationResult result = CsvValidator.Validate(table);
-
-foreach (ValidationError error in result.Errors)
-{
-    Debug.LogError(error);
-}
-```
-
-利用可能な制約は `PrimaryKey`、`NotNull`、`Unique`、`TypeConstraint`、`Range`、`Regex`、`AllowedValues`、`MinLength`、`MaxLength` です。
-
-### 条件付きValidation
-
-`Condition`を付けると、条件が成立した行だけValidation属性を適用できます。同じグループの条件はすべてANDとして評価されます。
-
-```csharp
-public enum ScenarioField
-{
-    Command,
-    Enabled,
-
-    [Condition(1, ScenarioField.Command, Compare.Equal, "Wait")]
-    [Condition(1, ScenarioField.Enabled, Compare.Equal, true)]
-    [NotNull(ConditionGroup = 1)]
-    [TypeConstraint(typeof(int), ConditionGroup = 1)]
-
-    [Condition(2, ScenarioField.Command, Compare.Equal, "SetFlag")]
-    [NotNull(ConditionGroup = 2)]
-    [TypeConstraint(typeof(bool), ConditionGroup = 2)]
-    Arg1
-}
-```
-
-グループを省略した場合はグループ0になります。単一条件なら番号を記述する必要はありません。
-
-```csharp
-[Condition(ScenarioField.Command, Compare.In, "Text", "Choice")]
-[NotNull]
-Text
-```
-
-`Compare`は `Equal`、`NotEqual`、`GreaterThan`、`GreaterThanOrEqual`、`LessThan`、`LessThanOrEqual`、`IsEmpty`、`IsNotEmpty`、`In`、`NotIn` を使用できます。文字列比較は既定で大文字小文字を区別し、`IgnoreCase = true`で無視できます。数値比較では数値リテラルを渡してください。
-
-```csharp
-[Condition(ScenarioField.Duration, Compare.GreaterThan, 0)]
-[Range(0, 10)]
-Arg1
-```
-
-比較値に同じEnum型のフィールドを指定すると、同じ行の列同士を比較します。
-
-```csharp
-[Condition(ScenarioField.Start, Compare.LessThanOrEqual, ScenarioField.End)]
-[NotNull]
-Text
-```
-
-Conditionは上から順に実行される`if / else`ではありません。各グループは独立して評価されるため、条件が重なると複数のValidationが同時に適用されます。else相当は`NotIn`や`NotEqual`で明示してください。
-
-## CSV Encoding
-
-RuntimeのCSV読み込みはUTF-8を前提とします。ProjectウィンドウでCSVを選択すると、Inspectorの `CSV Encoding` に元ファイルの判定結果とデコード後のプレビューが表示されます。
-
-Shift_JIS、UTF-16、UTF-32のCSVは、内容を確認してから `Convert to UTF-8` を押してください。変換結果はUTF-8（BOMなし）で元のCSVへ保存され、Gitの変更対象になります。自動判定が正しくない場合は `Source Encoding` で変換元を明示できます。
-
-CSV4Unityはインポート時にファイルを自動変換しません。変換前のCSVでは文字化けを避けるため、ViewerとInspector Validationを実行できません。
-
-## CSV Viewer
-
-ProjectウィンドウでCSVを選択し、Inspectorの `Open CSV Viewer` を押すと、CSVを読み取り専用の表として確認できます。CSVを右クリックして `Open in CSV Viewer` を選ぶか、`Window > CSV4Unity > CSV Viewer` から開くこともできます。
-
-- `Header` で先頭行をヘッダーとして扱うか切り替え
-- `Zoom` で表を75%から200%まで拡大・縮小
-- 検索欄で全セルを大文字小文字を区別せず絞り込み
-- ヘッダー境界のドラッグで列幅を変更
-- セルの右クリックでセルまたは行をコピー
-- CSVアセット更新時に自動再読込
-
-Viewerは画面に見える行だけを描画し、検索時もセル文字列の全コピーを作りません。CSVの編集や保存は行わず、表示にはRuntimeと同じParserを使用します。
-
-CSV用の追加UIは`.csv`のTextAssetにだけ表示されます。CSV本文のテキストプレビューはInspectorへ重複表示せず、表形式のViewerから確認します。`.txt`や`.json`など、それ以外のTextAssetはUnity標準Inspectorで表示します。
-
-## Inspector Validation
-
-1. Validation用Enumへ `[CsvSchema]` を付けます。
-2. UnityのProjectウィンドウでCSVを選択します。
-3. Inspectorの `Validation Schema` からEnumを選択します。
-4. `Validate CSV` を実行します。
-
-```csharp
-using CSV4Unity;
-using CSV4Unity.Validation;
-
-namespace MyGame.Data
-{
-    [CsvSchema]
-    public enum ItemFields
-    {
-        [PrimaryKey]
-        Id,
-
-        [NotNull]
-        Name
-    }
-}
-```
-
-`CsvSchema`はUnity EditorがInspector候補を発見するための属性です。`WithFields<TField>()`や`CSVLoader.LoadTable<TField>()`をコードから使用するだけであれば必須ではありません。
-
-旧バージョンとの互換性のため、`CSV4Unity.Fields`名前空間のEnumも当面は候補へ表示されます。新しいスキーマでは名前空間規約を使用せず、`CsvSchema`を付けてください。
-
-## Parser設定
-
-```csharp
-var options = new CsvParseOptions
-{
-    HasHeader = true,
-    Delimiter = ',',
-    IgnoreEmptyRecords = true,
-    TrimUnquotedFields = true
-};
-```
-
-## 設計資料
-
-- [日本語コア設計](./docs/ja/architecture.md)
-- [English core architecture](./docs/en/architecture.md)
-
-## 開発用ファイル
-
-`Assets/Scripts` と `Assets/TestData/CSV4Unity` は、このリポジトリ自身のExample・テスト用です。UPMで指定する `Assets/Plugins/CSVLoader` には含まれません。
-
-## ライセンス
-
-[MIT License](./LICENSE)
+[MIT](LICENSE)

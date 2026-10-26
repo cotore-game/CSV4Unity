@@ -1,10 +1,14 @@
 - name: Home
   href: index.md
-- name: APIリファレンス
+- name: User guide
+  href: en/guide.md
+- name: API reference
   href: api/CSV4Unity.html
+- name: Core architecture
+  href: en/architecture.md
+- name: 日本語利用ガイド
+  href: ja/guide.md
 - name: コア設計（日本語）
   href: ja/architecture.md
 - name: ベンチマーク（日本語）
   href: ja/benchmark.md
-- name: Core architecture (English)
-  href: en/architecture.md

@@ -1,5 +1,9 @@
 # CSV4Unity Core Architecture
 
+Design notes for contributors and maintainers. For installation and usage, start with the [user guide](guide.md).
+
+[日本語](../ja/architecture.md)
+
 ## Design goals
 
 - Parse RFC 4180 records in one forward pass.

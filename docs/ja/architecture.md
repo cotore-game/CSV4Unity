@@ -1,5 +1,9 @@
 # CSV4Unity コア設計
 
+開発・保守に参加する方向けの設計資料です。導入と使用例は[利用ガイド](guide.md)を参照してください。
+
+[English](../en/architecture.md)
+
 ## 最初に知っておくこと
 
 CSV4Unityは、CSVをクラスへ一括変換するライブラリではありません。
@@ -34,7 +38,7 @@ int count = table.Row(2)[ScenarioField.Arg1].Get<int>();
 ```text
 Unity TextAsset
     ↓ CSVLoader
-CSV文字列
+CSV source string
     ↓ CsvParser
 CsvDocument
     ├── CsvRow / CsvColumn / CsvCell
@@ -59,13 +63,13 @@ CsvDocument
 
 ```text
 CsvDocument
-  ├── 元のCSV文字列
-  ├── セルの開始位置と長さの配列
-  ├── ヘッダー配列
-  └── ヘッダー名から列番号への対応表
+  ├── CSV source string
+  ├── Cell start/length ranges
+  ├── Headers
+  └── Header lookup
 
 CsvRow / CsvColumn / CsvCell
-  └── CsvDocumentとインデックスだけを参照
+  └── References to CsvDocument and indices only
 ```
 
 現在の `CsvDocument` は読み取り専用です。将来CSV編集を実装する場合は、直接可変にせず、編集専用の別クラスを用意します。
@@ -118,7 +122,7 @@ public enum ScenarioField
 
 ```csv
 Command,Arg1,Arg2,Text
-Text,,,こんにちは
+Text,,,Hello!
 ```
 
 CSV側の命名を変更できない場合は `CsvHeader` で別名を指定できます。
@@ -233,13 +237,13 @@ v0.xでは互換性のため、`CSV4Unity.Fields`名前空間にある属性な�
 下位のクラスは上位の都合を知りません。
 
 ```text
-Unity連携 → Parser → Document
+Unity integration → Parser → Document
                        ↑
 Schema ────────────────┘
 
-Conversion → Cellが利用
-Indexing   → Columnを利用
-Validation → Table / Schema / Cellを利用
+Cell       → Conversion
+Indexing   → Column
+Validation → Table / Schema / Cell
 ```
 
 - `CsvDocument` はUnityを知りません。
@@ -253,8 +257,6 @@ Validation → Table / Schema / Cellを利用
 再設計前の `LoadCSV`、`CsvData`、`LineData` と旧Validatorは削除しました。
 読み込みには `LoadDocument` または `LoadTable<TField>` を使用します。
 
-## 今後の予定
+## 将来の拡張
 
-1. Validationのエラー表現と日本語開発者向け説明を整える。
-2. CSV編集用の可変モデルと書き出し処理を別レイヤーとして設計する。
-3. APIが固まった段階で英語文書とHTML APIリファレンスを整備する。
+CSV編集を追加する場合は、読み取り専用の `CsvDocument` と分離した可変モデルと書き出し処理を設計します。これは現在の機能ではありません。
