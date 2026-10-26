@@ -3,11 +3,6 @@ name: Unity Tests
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "Assets/**"
-      - "Packages/**"
-      - "ProjectSettings/**"
-      - ".github/workflows/unity-tests.yml"
   push:
     branches: [main]
     paths:
